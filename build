@@ -4,6 +4,11 @@
 #	Simple wiringPi build and install script
 #
 #	Copyright (c) 2012-2015 Gordon Henderson
+# Modified by: hexzhen3x7 for Banana Pi
+# 
+# Author: hexzhen3x7
+# Version: 0.1
+# Github: https://github.com/bpi-codehunterz-world/BPI-WiringPi2
 #################################################################################
 # This file is part of wiringPi:
 #	A "wiring" library for the Raspberry Pi
