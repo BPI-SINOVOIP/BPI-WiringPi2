@@ -175,6 +175,30 @@ int *pinTobcm_BP ;
 #define MESON_GPIOAO_MUX_REG0_OFFSET   0x105
 #define MESON_GPIOAO_MUX_REG1_OFFSET   0x106
 
+//SpacemiT K1 GPIO
+#define SPACEMIT_GPIO_BASE_BP          (0xD4019000)
+#define SPACEMIT_PINCTRL_BASE_BP       (0xD401E000)
+#define SPACEMIT_GPIO_PIN_BASE         0
+#define SPACEMIT_GPIO_PIN_END          127
+
+#define SPACEMIT_BANK012_OFFSET(x)     ((x) << 2)
+#define SPACEMIT_BANK3_OFFSET          0x100
+
+#define SPACEMIT_GPLR                  0x0
+#define SPACEMIT_GPDR                  0xC
+#define SPACEMIT_GPSR                  0x18
+#define SPACEMIT_GPCR                  0x24
+#define SPACEMIT_GSDR                  0x54
+#define SPACEMIT_GCDR                  0x60
+
+#define SPACEMIT_AF_SEL_OFFSET         0
+#define SPACEMIT_AF_SEL_MASK           (7 << 0)
+#define SPACEMIT_PULL_DIS              0
+#define SPACEMIT_PULL_UP               6
+#define SPACEMIT_PULL_DOWN             5
+#define SPACEMIT_PULL_OFFSET           13
+#define SPACEMIT_PULL_MASK             (7 << 13)
+
 //sunxi_pwm, only use ch0
 #define SUNXI_PWM_BASE        (0x01c21400)
 #define SUNXI_PWM_CH0_CTRL    (SUNXI_PWM_BASE)
@@ -212,9 +236,12 @@ static int wiringPinMode = WPI_MODE_UNINITIALISED ;
 static int bpi_found_mtk = 0 ;
 static int bpi_found_sun50iw9 = 0 ;
 static int bpi_found_meson = 0 ;
+static int bpi_found_spacemit = 0 ;
 static uint8_t *mtk_gpio_base = NULL ;
 static volatile uint32_t *meson_gpio = NULL ;
 static volatile uint32_t *meson_gpioao = NULL ;
+static volatile uint32_t *spacemit_gpio = NULL ;
+static volatile uint32_t *spacemit_pinctrl = NULL ;
 
 
 static int syspin [64] =
@@ -1304,6 +1331,157 @@ static void meson_digitalWrite(int pin, int value)
   meson_update_reg(pin, offset, value == LOW ? 1u << shift : 0, value == LOW ? 0 : 1u << shift);
 }
 
+static int spacemit_gpio_mapped(void)
+{
+  return spacemit_gpio != NULL && spacemit_pinctrl != NULL;
+}
+
+static int spacemit_is_pin(int pin)
+{
+  return pin >= SPACEMIT_GPIO_PIN_BASE && pin <= SPACEMIT_GPIO_PIN_END;
+}
+
+static int spacemit_mfpr_offset(int pin)
+{
+  if (pin < SPACEMIT_GPIO_PIN_BASE || pin > SPACEMIT_GPIO_PIN_END)
+    return -1;
+  if (pin <= 85)
+    return (pin + 1) << 2;
+  if (pin <= 92)
+    return ((pin + 1) << 2) + 0x90;
+
+  return ((pin + 1) << 2) + 0x4C;
+}
+
+static int spacemit_gpio_alt(int pin)
+{
+  if ((pin >= 70 && pin <= 73) || (pin >= 93 && pin <= 103))
+    return 1;
+  if (pin >= 104 && pin <= 109)
+    return 4;
+
+  return 0;
+}
+
+static int spacemit_bank_offset(int pin)
+{
+  int bank = pin >> 5;
+
+  return bank == 3 ? SPACEMIT_BANK3_OFFSET : SPACEMIT_BANK012_OFFSET(bank);
+}
+
+static int spacemit_pin_shift(int pin)
+{
+  return pin & 0x1F;
+}
+
+static void spacemit_update_reg(volatile uint32_t *base, int offset, uint32_t clear, uint32_t set)
+{
+  volatile uint32_t *reg;
+  uint32_t regval;
+
+  if (!spacemit_gpio_mapped() || offset < 0)
+    return;
+
+  reg = base + (offset >> 2);
+  regval = *reg;
+  regval &= ~clear;
+  regval |= set;
+  *reg = regval;
+}
+
+static void spacemit_set_pin_alt(int pin, int mode)
+{
+  int mfpr = spacemit_mfpr_offset(pin);
+
+  if (!spacemit_is_pin(pin) || mfpr < 0)
+    return;
+
+  spacemit_update_reg(spacemit_pinctrl, mfpr, SPACEMIT_AF_SEL_MASK,
+                      (uint32_t)(mode & 0x7) << SPACEMIT_AF_SEL_OFFSET);
+}
+
+static void spacemit_set_pin_mode(int pin, int mode)
+{
+  int mfpr = spacemit_mfpr_offset(pin);
+  int bank = spacemit_bank_offset(pin);
+  int shift = spacemit_pin_shift(pin);
+  int dir_offset;
+
+  if (!spacemit_is_pin(pin) || mfpr < 0)
+    return;
+
+  spacemit_update_reg(spacemit_pinctrl, mfpr, SPACEMIT_AF_SEL_MASK,
+                      (uint32_t)spacemit_gpio_alt(pin) << SPACEMIT_AF_SEL_OFFSET);
+
+  if (mode == INPUT)
+    dir_offset = bank + SPACEMIT_GCDR;
+  else if (mode == OUTPUT)
+    dir_offset = bank + SPACEMIT_GSDR;
+  else
+    return;
+
+  spacemit_update_reg(spacemit_gpio, dir_offset, 0, 1u << shift);
+}
+
+static int spacemit_get_pin_mode(int pin)
+{
+  int mfpr = spacemit_mfpr_offset(pin);
+  int bank = spacemit_bank_offset(pin);
+  int shift = spacemit_pin_shift(pin);
+  uint32_t af_sel;
+
+  if (!spacemit_is_pin(pin) || mfpr < 0 || !spacemit_gpio_mapped())
+    return 0;
+
+  af_sel = (*(spacemit_pinctrl + (mfpr >> 2))) & SPACEMIT_AF_SEL_MASK;
+  if (af_sel != (uint32_t)spacemit_gpio_alt(pin))
+    return (int)af_sel + 2;
+
+  return (*(spacemit_gpio + ((bank + SPACEMIT_GPDR) >> 2)) & (1u << shift)) ? OUTPUT : INPUT;
+}
+
+static void spacemit_pullUpDnControl(int pin, int pud)
+{
+  int mfpr = spacemit_mfpr_offset(pin);
+  uint32_t pull = SPACEMIT_PULL_DIS;
+
+  if (!spacemit_is_pin(pin) || mfpr < 0)
+    return;
+
+  if (pud == PUD_UP)
+    pull = SPACEMIT_PULL_UP;
+  else if (pud == PUD_DOWN)
+    pull = SPACEMIT_PULL_DOWN;
+
+  spacemit_update_reg(spacemit_pinctrl, mfpr, SPACEMIT_PULL_MASK,
+                      (pull & 0x7) << SPACEMIT_PULL_OFFSET);
+}
+
+static int spacemit_digitalRead(int pin)
+{
+  int bank = spacemit_bank_offset(pin);
+  int shift = spacemit_pin_shift(pin);
+
+  if (!spacemit_is_pin(pin) || !spacemit_gpio_mapped())
+    return LOW;
+
+  return (*(spacemit_gpio + ((bank + SPACEMIT_GPLR) >> 2)) & (1u << shift)) ? HIGH : LOW;
+}
+
+static void spacemit_digitalWrite(int pin, int value)
+{
+  int bank = spacemit_bank_offset(pin);
+  int shift = spacemit_pin_shift(pin);
+  int offset;
+
+  if (!spacemit_is_pin(pin) || !spacemit_gpio_mapped())
+    return;
+
+  offset = bank + (value == LOW ? SPACEMIT_GPCR : SPACEMIT_GPSR);
+  spacemit_update_reg(spacemit_gpio, offset, 0, 1u << shift);
+}
+
 #ifdef BPI
 
 int bpi_getAlt (int pin)
@@ -1329,6 +1507,8 @@ int bpi_getAlt (int pin)
     return mtk_get_pin_mode(pin);
   if (bpi_found_meson)
     return meson_get_pin_mode(pin);
+  if (bpi_found_spacemit)
+    return spacemit_get_pin_mode(pin);
 
   alt=sunxi_get_pin_mode(pin);
   return alt ;
@@ -1337,7 +1517,7 @@ int bpi_getAlt (int pin)
 
 void bpi_pwmSetMode (int mode)
 {
-  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson)
+  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit)
     return;
 
   sunxi_pwm_set_mode(mode);
@@ -1347,7 +1527,7 @@ void bpi_pwmSetMode (int mode)
 
 void bpi_pwmSetRange (unsigned int range)
 {
-  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson)
+  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit)
     return;
 
   sunxi_pwm_set_period(range);
@@ -1357,7 +1537,7 @@ void bpi_pwmSetRange (unsigned int range)
 
 void bpi_pwmSetClock (int divisor)
 {
-  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson)
+  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit)
     return;
 
   sunxi_pwm_set_clk(divisor);
@@ -1437,6 +1617,11 @@ void bpi_pinModeAlt (int pin, int mode)
       meson_set_pin_alt(pin, mode);
       return;
     }
+    if (bpi_found_spacemit)
+    {
+      spacemit_set_pin_alt(pin, mode);
+      return;
+    }
     sunxi_set_pin_alt(pin,mode);
   }
 }
@@ -1511,6 +1696,32 @@ void bpi_pinMode (int pin, int mode)
       else if (mode == PULLOFF)
       {
         meson_pullUpDnControl(pin, PUD_OFF);
+      }
+      else
+      {
+        return;
+      }
+      wiringPinMode = mode;
+      return;
+    }
+
+    if (bpi_found_spacemit)
+    {
+      if (mode == INPUT || mode == OUTPUT)
+      {
+        spacemit_set_pin_mode(pin, mode);
+      }
+      else if (mode == PULLUP)
+      {
+        spacemit_pullUpDnControl(pin, PUD_UP);
+      }
+      else if (mode == PULLDOWN)
+      {
+        spacemit_pullUpDnControl(pin, PUD_DOWN);
+      }
+      else if (mode == PULLOFF)
+      {
+        spacemit_pullUpDnControl(pin, PUD_OFF);
       }
       else
       {
@@ -1620,6 +1831,11 @@ void bpi_pullUpDnControl (int pin, int pud)
       meson_pullUpDnControl(pin, pud);
       return;
     }
+    if (bpi_found_spacemit)
+    {
+      spacemit_pullUpDnControl(pin, pud);
+      return;
+    }
     sunxi_pullUpDnControl(pin, pud);
     return;
   }
@@ -1682,6 +1898,8 @@ int bpi_digitalRead (int pin)
       return mtk_digitalRead(pin);
     if (bpi_found_meson)
       return meson_digitalRead(pin);
+    if (bpi_found_spacemit)
+      return spacemit_digitalRead(pin);
 
     return sunxi_digitalRead(pin);
   }
@@ -1748,6 +1966,11 @@ void bpi_digitalWrite (int pin, int value)
       meson_digitalWrite(pin, value);
       return;
     }
+    if (bpi_found_spacemit)
+    {
+      spacemit_digitalWrite(pin, value);
+      return;
+    }
     sunxi_digitalWrite(pin, value); 
   }
   else
@@ -1764,7 +1987,7 @@ void bpi_pwmWrite (int pin, int value)
 
   uint32_t a_val = 0;
 
-  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson)
+  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit)
     return;
 
   if(pwmmode==1)//sycle
@@ -1950,6 +2173,10 @@ struct BPIBoards bpiboard [] =
   { "bananapi-m2-pro", 11701, BPI_MODEL_M2PRO, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M5, physToGpio_BPI_M5, pinTobcm_BPI_M5, M5_I2C_DEV, M5_SPI_DEV, {M5_PWM_OFFSET,M5_I2C_OFFSET,M5_SPI_OFFSET} },
   { "banana-pi-m2pro", 11701, BPI_MODEL_M2PRO, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M5, physToGpio_BPI_M5, pinTobcm_BPI_M5, M5_I2C_DEV, M5_SPI_DEV, {M5_PWM_OFFSET,M5_I2C_OFFSET,M5_SPI_OFFSET} },
   { "banana-pi-m2-pro", 11701, BPI_MODEL_M2PRO, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M5, physToGpio_BPI_M5, pinTobcm_BPI_M5, M5_I2C_DEV, M5_SPI_DEV, {M5_PWM_OFFSET,M5_I2C_OFFSET,M5_SPI_OFFSET} },
+  { "bpi-f3",      11801, BPI_MODEL_F3, 1, 4, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_F3, physToGpio_BPI_F3, pinTobcm_BPI_F3, F3_I2C_DEV, F3_SPI_DEV, {F3_PWM_OFFSET,F3_I2C_OFFSET,F3_SPI_OFFSET} },
+  { "bananapif3",  11801, BPI_MODEL_F3, 1, 4, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_F3, physToGpio_BPI_F3, pinTobcm_BPI_F3, F3_I2C_DEV, F3_SPI_DEV, {F3_PWM_OFFSET,F3_I2C_OFFSET,F3_SPI_OFFSET} },
+  { "banana-pi-f3", 11801, BPI_MODEL_F3, 1, 4, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_F3, physToGpio_BPI_F3, pinTobcm_BPI_F3, F3_I2C_DEV, F3_SPI_DEV, {F3_PWM_OFFSET,F3_I2C_OFFSET,F3_SPI_OFFSET} },
+  { "bananapi-f3", 11801, BPI_MODEL_F3, 1, 4, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_F3, physToGpio_BPI_F3, pinTobcm_BPI_F3, F3_I2C_DEV, F3_SPI_DEV, {F3_PWM_OFFSET,F3_I2C_OFFSET,F3_SPI_OFFSET} },
   { "bpi-r2",	   11101, BPI_MODEL_R2, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R2, physToGpio_BPI_R2, pinTobcm_BPI_R2, R2_I2C_DEV, R2_SPI_DEV, {R2_PWM_OFFSET,R2_I2C_OFFSET,R2_SPI_OFFSET} },
   { NULL,		0, 0, 1, 2, 5, 0, NULL, NULL, NULL, NULL, NULL, {-1, -1, -1} },
 } ;
@@ -2015,6 +2242,14 @@ static struct BPIBoards *bpi_find_board_by_model_string(const char *hardware)
       strstr(hardware, "BPI-M2 Pro"))
     return bpi_find_board_by_name("bpi-m2pro");
 
+  if (strstr(hardware, "BananaPi BPI-F3") ||
+      strstr(hardware, "Banana Pi BPI-F3") ||
+      strstr(hardware, "BananaPi F3") ||
+      strstr(hardware, "Banana Pi F3") ||
+      strstr(hardware, "BPI-F3") ||
+      strstr(hardware, "k1-x deb1"))
+    return bpi_find_board_by_name("bpi-f3");
+
   return NULL;
 }
 
@@ -2047,6 +2282,7 @@ int bpi_piGpioLayout (void)
   bpi_found_mtk = 0;
   bpi_found_sun50iw9 = 0;
   bpi_found_meson = 0;
+  bpi_found_spacemit = 0;
   if ((bpiFd = fopen("/var/lib/bananapi/board.sh", "r")) != NULL) {
     while(fgets(buffer, sizeof(buffer), bpiFd) != NULL) {
       if (sscanf(buffer, "BOARD=%1023s", hardware) != 1)
@@ -2103,6 +2339,7 @@ void bpi_piBoardId (int *model, int *rev, int *mem, int *maker, int *warranty)
                        board->model == BPI_MODEL_CM4IO ||
                        board->model == BPI_MODEL_M5 ||
                        board->model == BPI_MODEL_M2PRO);
+    bpi_found_spacemit = (board->model == BPI_MODEL_F3);
     //printf("BPI: name[%s] bType(%d) model(%d)\n",board->name, bType, board->model);
     *model    = bType ;
     *rev      = bRev ;
@@ -2159,6 +2396,22 @@ int bpi_wiringPiSetup (void)
       meson_gpio = NULL;
       meson_gpioao = NULL;
       return wiringPiFailure (WPI_ALMOST,"wiringPiSetup: mmap (MESON GPIO) failed: %s\n", strerror (errno)) ;
+    }
+
+    initialiseEpoch () ;
+    return 0 ;
+  }
+
+  if (bpi_found_spacemit)
+  {
+    spacemit_gpio = (uint32_t *)mmap(0, BLOCK_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, SPACEMIT_GPIO_BASE_BP);
+    spacemit_pinctrl = (uint32_t *)mmap(0, BLOCK_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, SPACEMIT_PINCTRL_BASE_BP);
+    close(fd);
+    if (spacemit_gpio == MAP_FAILED || spacemit_pinctrl == MAP_FAILED)
+    {
+      spacemit_gpio = NULL;
+      spacemit_pinctrl = NULL;
+      return wiringPiFailure (WPI_ALMOST,"wiringPiSetup: mmap (SPACEMIT GPIO) failed: %s\n", strerror (errno)) ;
     }
 
     initialiseEpoch () ;
