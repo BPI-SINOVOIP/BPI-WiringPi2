@@ -3362,6 +3362,11 @@ struct BPIBoards bpiboard [] =
   { "bananapif3",  11801, BPI_MODEL_F3, 1, 4, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_F3, physToGpio_BPI_F3, pinTobcm_BPI_F3, F3_I2C_DEV, F3_SPI_DEV, {F3_PWM_OFFSET,F3_I2C_OFFSET,F3_SPI_OFFSET} },
   { "banana-pi-f3", 11801, BPI_MODEL_F3, 1, 4, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_F3, physToGpio_BPI_F3, pinTobcm_BPI_F3, F3_I2C_DEV, F3_SPI_DEV, {F3_PWM_OFFSET,F3_I2C_OFFSET,F3_SPI_OFFSET} },
   { "bananapi-f3", 11801, BPI_MODEL_F3, 1, 4, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_F3, physToGpio_BPI_F3, pinTobcm_BPI_F3, F3_I2C_DEV, F3_SPI_DEV, {F3_PWM_OFFSET,F3_I2C_OFFSET,F3_SPI_OFFSET} },
+  { "bpi-cm6",     13501, BPI_MODEL_CM6, 1, 4, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_CM6, physToGpio_BPI_CM6, pinTobcm_BPI_CM6, CM6_I2C_DEV, CM6_SPI_DEV, {CM6_PWM_OFFSET,CM6_I2C_OFFSET,CM6_SPI_OFFSET} },
+  { "bananapicm6", 13501, BPI_MODEL_CM6, 1, 4, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_CM6, physToGpio_BPI_CM6, pinTobcm_BPI_CM6, CM6_I2C_DEV, CM6_SPI_DEV, {CM6_PWM_OFFSET,CM6_I2C_OFFSET,CM6_SPI_OFFSET} },
+  { "bananapi-cm6", 13501, BPI_MODEL_CM6, 1, 4, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_CM6, physToGpio_BPI_CM6, pinTobcm_BPI_CM6, CM6_I2C_DEV, CM6_SPI_DEV, {CM6_PWM_OFFSET,CM6_I2C_OFFSET,CM6_SPI_OFFSET} },
+  { "banana-pi-cm6", 13501, BPI_MODEL_CM6, 1, 4, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_CM6, physToGpio_BPI_CM6, pinTobcm_BPI_CM6, CM6_I2C_DEV, CM6_SPI_DEV, {CM6_PWM_OFFSET,CM6_I2C_OFFSET,CM6_SPI_OFFSET} },
+  { "bpi-cm6-io",  13501, BPI_MODEL_CM6, 1, 4, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_CM6, physToGpio_BPI_CM6, pinTobcm_BPI_CM6, CM6_I2C_DEV, CM6_SPI_DEV, {CM6_PWM_OFFSET,CM6_I2C_OFFSET,CM6_SPI_OFFSET} },
   { "bpi-ai2n",    11901, BPI_MODEL_AI2N, 1, 5, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_AI2N, physToGpio_BPI_AI2N, pinTobcm_BPI_AI2N, AI2N_I2C_DEV, AI2N_SPI_DEV, {AI2N_PWM_OFFSET,AI2N_I2C_OFFSET,AI2N_SPI_OFFSET} },
   { "bpi-ai2-n",   11901, BPI_MODEL_AI2N, 1, 5, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_AI2N, physToGpio_BPI_AI2N, pinTobcm_BPI_AI2N, AI2N_I2C_DEV, AI2N_SPI_DEV, {AI2N_PWM_OFFSET,AI2N_I2C_OFFSET,AI2N_SPI_OFFSET} },
   { "bananapiai2n", 11901, BPI_MODEL_AI2N, 1, 5, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_AI2N, physToGpio_BPI_AI2N, pinTobcm_BPI_AI2N, AI2N_I2C_DEV, AI2N_SPI_DEV, {AI2N_PWM_OFFSET,AI2N_I2C_OFFSET,AI2N_SPI_OFFSET} },
@@ -3782,6 +3787,13 @@ static struct BPIBoards *bpi_find_board_by_model_string(const char *hardware)
       strstr(hardware, "BPI-M2 Pro"))
     return bpi_find_board_by_name("bpi-m2pro");
 
+  if (strstr(hardware, "BananaPi BPI-CM6") ||
+      strstr(hardware, "Banana Pi BPI-CM6") ||
+      strstr(hardware, "BananaPi CM6") ||
+      strstr(hardware, "Banana Pi CM6") ||
+      strstr(hardware, "BPI-CM6"))
+    return bpi_find_board_by_name("bpi-cm6");
+
   if (strstr(hardware, "BananaPi BPI-F3") ||
       strstr(hardware, "Banana Pi BPI-F3") ||
       strstr(hardware, "BananaPi F3") ||
@@ -3900,7 +3912,8 @@ void bpi_piBoardId (int *model, int *rev, int *mem, int *maker, int *warranty)
                        board->model == BPI_MODEL_CM4IO ||
                        board->model == BPI_MODEL_M5 ||
                        board->model == BPI_MODEL_M2PRO);
-    bpi_found_spacemit = (board->model == BPI_MODEL_F3);
+    bpi_found_spacemit = (board->model == BPI_MODEL_F3 ||
+                           board->model == BPI_MODEL_CM6);
     bpi_found_renesas = (board->model == BPI_MODEL_AI2N);
     bpi_found_rockchip = bpi_model_is_rockchip(board->model);
     if (bpi_found_rockchip)

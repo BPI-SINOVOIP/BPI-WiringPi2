@@ -411,6 +411,7 @@ const char *piModelNames [PI_MODELS_MAX] =
   [BPI_MODEL_M4]      = "Banana Pi M4[RTD1395]",
   [BPI_MODEL_F2S]     = "Banana Pi F2S[Sunplus SP7021]",
   [BPI_MODEL_F2P]     = "Banana Pi F2P[Sunplus SP7021]",
+  [BPI_MODEL_CM6]     = "Banana Pi CM6[SpacemiT K1]",
 #endif
 } ;
 
