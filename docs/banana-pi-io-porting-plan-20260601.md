@@ -139,10 +139,13 @@ The supported IO surface is:
 
 ## Current Next Item
 
-Continue Batch B from `BPI-CM4IO`.
+Continue Batch B from `BPI-M5` / `BPI-M2 Pro`.
 
 Resume sequence:
 
-1. Finish `BPI-CM4IO` in this repo, build-test, commit, and push.
-2. Finish `BPI-CM4IO` in `RPi.GPIO`, build-test, commit, and push.
-3. Continue with `BPI-M5` and `BPI-M2 Pro` after confirming the SM1 maps.
+1. Confirm the `BPI-M5` and `BPI-M2 Pro` SM1 maps against Dangku and Armbian
+   board strings.
+2. Add `BPI-M5` in this repo, build-test, commit, and push.
+3. Add `BPI-M5` in `RPi.GPIO`, build-test, commit, and push.
+4. Repeat for `BPI-M2 Pro` if its carrier map differs; otherwise add it as a
+   documented alias in both repos.
