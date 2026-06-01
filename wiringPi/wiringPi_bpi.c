@@ -1933,6 +1933,12 @@ struct BPIBoards bpiboard [] =
   { "bananapim2s", 11401, BPI_MODEL_M2S, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M2S, physToGpio_BPI_M2S, pinTobcm_BPI_M2S, M2S_I2C_DEV, M2S_SPI_DEV, {M2S_PWM_OFFSET,M2S_I2C_OFFSET,M2S_SPI_OFFSET} },
   { "banana-pi-m2s", 11401, BPI_MODEL_M2S, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M2S, physToGpio_BPI_M2S, pinTobcm_BPI_M2S, M2S_I2C_DEV, M2S_SPI_DEV, {M2S_PWM_OFFSET,M2S_I2C_OFFSET,M2S_SPI_OFFSET} },
   { "bananapi-m2s", 11401, BPI_MODEL_M2S, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M2S, physToGpio_BPI_M2S, pinTobcm_BPI_M2S, M2S_I2C_DEV, M2S_SPI_DEV, {M2S_PWM_OFFSET,M2S_I2C_OFFSET,M2S_SPI_OFFSET} },
+  { "bpi-cm4io",   11501, BPI_MODEL_CM4IO, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_CM4IO, physToGpio_BPI_CM4IO, pinTobcm_BPI_CM4IO, CM4IO_I2C_DEV, CM4IO_SPI_DEV, {CM4IO_PWM_OFFSET,CM4IO_I2C_OFFSET,CM4IO_SPI_OFFSET} },
+  { "bpi-cm4-io",  11501, BPI_MODEL_CM4IO, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_CM4IO, physToGpio_BPI_CM4IO, pinTobcm_BPI_CM4IO, CM4IO_I2C_DEV, CM4IO_SPI_DEV, {CM4IO_PWM_OFFSET,CM4IO_I2C_OFFSET,CM4IO_SPI_OFFSET} },
+  { "bananapicm4io", 11501, BPI_MODEL_CM4IO, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_CM4IO, physToGpio_BPI_CM4IO, pinTobcm_BPI_CM4IO, CM4IO_I2C_DEV, CM4IO_SPI_DEV, {CM4IO_PWM_OFFSET,CM4IO_I2C_OFFSET,CM4IO_SPI_OFFSET} },
+  { "banana-pi-cm4io", 11501, BPI_MODEL_CM4IO, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_CM4IO, physToGpio_BPI_CM4IO, pinTobcm_BPI_CM4IO, CM4IO_I2C_DEV, CM4IO_SPI_DEV, {CM4IO_PWM_OFFSET,CM4IO_I2C_OFFSET,CM4IO_SPI_OFFSET} },
+  { "bpi-cm4",     11501, BPI_MODEL_CM4IO, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_CM4IO, physToGpio_BPI_CM4IO, pinTobcm_BPI_CM4IO, CM4IO_I2C_DEV, CM4IO_SPI_DEV, {CM4IO_PWM_OFFSET,CM4IO_I2C_OFFSET,CM4IO_SPI_OFFSET} },
+  { "bananapicm4", 11501, BPI_MODEL_CM4IO, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_CM4IO, physToGpio_BPI_CM4IO, pinTobcm_BPI_CM4IO, CM4IO_I2C_DEV, CM4IO_SPI_DEV, {CM4IO_PWM_OFFSET,CM4IO_I2C_OFFSET,CM4IO_SPI_OFFSET} },
   { "bpi-r2",	   11101, BPI_MODEL_R2, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R2, physToGpio_BPI_R2, pinTobcm_BPI_R2, R2_I2C_DEV, R2_SPI_DEV, {R2_PWM_OFFSET,R2_I2C_OFFSET,R2_SPI_OFFSET} },
   { NULL,		0, 0, 1, 2, 5, 0, NULL, NULL, NULL, NULL, NULL, {-1, -1, -1} },
 } ;
@@ -1969,6 +1975,15 @@ static struct BPIBoards *bpi_find_board_by_model_string(const char *hardware)
       strstr(hardware, "Banana Pi M2S") ||
       strstr(hardware, "BPI-M2S"))
     return bpi_find_board_by_name("bpi-m2s");
+
+  if (strstr(hardware, "Bananapi BPI-CM4") ||
+      strstr(hardware, "BananaPi BPI-CM4") ||
+      strstr(hardware, "Banana Pi BPI-CM4") ||
+      strstr(hardware, "BananaPi BPI-CM4IO") ||
+      strstr(hardware, "Banana Pi BPI-CM4IO") ||
+      strstr(hardware, "BPI-CM4IO") ||
+      strstr(hardware, "BPI-CM4"))
+    return bpi_find_board_by_name("bpi-cm4io");
 
   return NULL;
 }
@@ -2054,7 +2069,7 @@ void bpi_piBoardId (int *model, int *rev, int *mem, int *maker, int *warranty)
     pinTobcm_BP = board->pinTobcm ;
     bpi_found_mtk = (board->model == BPI_MODEL_R2);
     bpi_found_sun50iw9 = (board->model == BPI_MODEL_M4BERRY || board->model == BPI_MODEL_M4ZERO);
-    bpi_found_meson = (board->model == BPI_MODEL_M2S);
+    bpi_found_meson = (board->model == BPI_MODEL_M2S || board->model == BPI_MODEL_CM4IO);
     //printf("BPI: name[%s] bType(%d) model(%d)\n",board->name, bType, board->model);
     *model    = bType ;
     *rev      = bRev ;
