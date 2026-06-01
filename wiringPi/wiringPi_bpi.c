@@ -2662,6 +2662,17 @@ struct BPIBoards bpiboard [] =
   { "bananapim7",  12301, BPI_MODEL_M7, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M7, physToGpio_BPI_M7, pinTobcm_BPI_M7, M7_I2C_DEV, M7_SPI_DEV, {M7_PWM_OFFSET,M7_I2C_OFFSET,M7_SPI_OFFSET} },
   { "banana-pi-m7", 12301, BPI_MODEL_M7, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M7, physToGpio_BPI_M7, pinTobcm_BPI_M7, M7_I2C_DEV, M7_SPI_DEV, {M7_PWM_OFFSET,M7_I2C_OFFSET,M7_SPI_OFFSET} },
   { "bananapi-m7", 12301, BPI_MODEL_M7, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M7, physToGpio_BPI_M7, pinTobcm_BPI_M7, M7_I2C_DEV, M7_SPI_DEV, {M7_PWM_OFFSET,M7_I2C_OFFSET,M7_SPI_OFFSET} },
+  { "bpi-w3",      12401, BPI_MODEL_W3, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_W3, physToGpio_BPI_W3, pinTobcm_BPI_W3, W3_I2C_DEV, W3_SPI_DEV, {W3_PWM_OFFSET,W3_I2C_OFFSET,W3_SPI_OFFSET} },
+  { "bananapiw3",  12401, BPI_MODEL_W3, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_W3, physToGpio_BPI_W3, pinTobcm_BPI_W3, W3_I2C_DEV, W3_SPI_DEV, {W3_PWM_OFFSET,W3_I2C_OFFSET,W3_SPI_OFFSET} },
+  { "banana-pi-w3", 12401, BPI_MODEL_W3, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_W3, physToGpio_BPI_W3, pinTobcm_BPI_W3, W3_I2C_DEV, W3_SPI_DEV, {W3_PWM_OFFSET,W3_I2C_OFFSET,W3_SPI_OFFSET} },
+  { "bananapi-w3", 12401, BPI_MODEL_W3, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_W3, physToGpio_BPI_W3, pinTobcm_BPI_W3, W3_I2C_DEV, W3_SPI_DEV, {W3_PWM_OFFSET,W3_I2C_OFFSET,W3_SPI_OFFSET} },
+  { "armsom-w3",   12401, BPI_MODEL_W3, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_W3, physToGpio_BPI_W3, pinTobcm_BPI_W3, W3_I2C_DEV, W3_SPI_DEV, {W3_PWM_OFFSET,W3_I2C_OFFSET,W3_SPI_OFFSET} },
+  { "bpi-aim7",    12501, BPI_MODEL_AIM7, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M7, physToGpio_BPI_M7, pinTobcm_BPI_M7, M7_I2C_DEV, M7_SPI_DEV, {M7_PWM_OFFSET,M7_I2C_OFFSET,M7_SPI_OFFSET} },
+  { "bananapiaim7", 12501, BPI_MODEL_AIM7, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M7, physToGpio_BPI_M7, pinTobcm_BPI_M7, M7_I2C_DEV, M7_SPI_DEV, {M7_PWM_OFFSET,M7_I2C_OFFSET,M7_SPI_OFFSET} },
+  { "banana-pi-aim7", 12501, BPI_MODEL_AIM7, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M7, physToGpio_BPI_M7, pinTobcm_BPI_M7, M7_I2C_DEV, M7_SPI_DEV, {M7_PWM_OFFSET,M7_I2C_OFFSET,M7_SPI_OFFSET} },
+  { "bananapi-aim7", 12501, BPI_MODEL_AIM7, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M7, physToGpio_BPI_M7, pinTobcm_BPI_M7, M7_I2C_DEV, M7_SPI_DEV, {M7_PWM_OFFSET,M7_I2C_OFFSET,M7_SPI_OFFSET} },
+  { "armsom-aim7", 12501, BPI_MODEL_AIM7, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M7, physToGpio_BPI_M7, pinTobcm_BPI_M7, M7_I2C_DEV, M7_SPI_DEV, {M7_PWM_OFFSET,M7_I2C_OFFSET,M7_SPI_OFFSET} },
+  { "armsom-aim7-io", 12501, BPI_MODEL_AIM7, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M7, physToGpio_BPI_M7, pinTobcm_BPI_M7, M7_I2C_DEV, M7_SPI_DEV, {M7_PWM_OFFSET,M7_I2C_OFFSET,M7_SPI_OFFSET} },
   { "bpi-r2",	   11101, BPI_MODEL_R2, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R2, physToGpio_BPI_R2, pinTobcm_BPI_R2, R2_I2C_DEV, R2_SPI_DEV, {R2_PWM_OFFSET,R2_I2C_OFFSET,R2_SPI_OFFSET} },
   { NULL,		0, 0, 1, 2, 5, 0, NULL, NULL, NULL, NULL, NULL, {-1, -1, -1} },
 } ;
@@ -2686,7 +2697,9 @@ static int bpi_model_is_rk3576(int model)
 
 static int bpi_model_is_rk3588(int model)
 {
-  return model == BPI_MODEL_M7;
+  return model == BPI_MODEL_M7 ||
+      model == BPI_MODEL_W3 ||
+      model == BPI_MODEL_AIM7;
 }
 
 static int bpi_model_is_rockchip(int model)
@@ -2771,6 +2784,31 @@ static struct BPIBoards *bpi_find_board_by_model_string(const char *hardware)
       strstr(hardware, "bananapi,m7") ||
       strstr(hardware, "rk3588-bananapi-m7"))
     return bpi_find_board_by_name("bpi-m7");
+
+  if (strstr(hardware, "Banana Pi BPI-W3") ||
+      strstr(hardware, "BananaPi BPI-W3") ||
+      strstr(hardware, "Banana Pi W3") ||
+      strstr(hardware, "BananaPi W3") ||
+      strstr(hardware, "BPI-W3") ||
+      strstr(hardware, "ArmSoM W3") ||
+      strstr(hardware, "armsom w3") ||
+      strstr(hardware, "bananapi,bpi-w3") ||
+      strstr(hardware, "armsom,w3") ||
+      strstr(hardware, "rk3588-bananapi-w3") ||
+      strstr(hardware, "rk3588-armsom-w3"))
+    return bpi_find_board_by_name("bpi-w3");
+
+  if (strstr(hardware, "Banana Pi BPI-AIM7") ||
+      strstr(hardware, "BananaPi BPI-AIM7") ||
+      strstr(hardware, "Banana Pi AIM7") ||
+      strstr(hardware, "BananaPi AIM7") ||
+      strstr(hardware, "BPI-AIM7") ||
+      strstr(hardware, "ArmSoM AIM7 IO") ||
+      strstr(hardware, "ArmSoM AIM7") ||
+      strstr(hardware, "armsom,aim7-io") ||
+      strstr(hardware, "armsom,aim7") ||
+      strstr(hardware, "rk3588-armsom-aim7-io"))
+    return bpi_find_board_by_name("bpi-aim7");
 
   if (strstr(hardware, "Banana Pi BPI-M5") ||
       strstr(hardware, "BananaPi BPI-M5") ||
