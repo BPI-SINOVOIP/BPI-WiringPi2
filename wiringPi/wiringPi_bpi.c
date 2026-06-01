@@ -251,10 +251,13 @@ int *pinTobcm_BP ;
 #define REALTEK_GPIO_MAP_SIZE          0x100
 #define REALTEK_RTD129X_MISC_BASE      0x9801b100
 #define REALTEK_RTD129X_ISO_BASE       0x98007100
+#define REALTEK_RTD139X_ISO_BASE       0x98007100
 #define REALTEK_RTD129X_MISC_PIN_BASE  0
 #define REALTEK_RTD129X_MISC_PIN_END   100
 #define REALTEK_RTD129X_ISO_PIN_BASE   101
 #define REALTEK_RTD129X_ISO_PIN_END    135
+#define REALTEK_RTD139X_ISO_PIN_BASE   0
+#define REALTEK_RTD139X_ISO_PIN_END    56
 
 struct realtek_gpio_group
 {
@@ -390,6 +393,20 @@ static const struct realtek_gpio_group realtek_rtd129x_groups[REALTEK_GPIO_GROUP
 static const off_t realtek_gpio_base_rtd129x[REALTEK_GPIO_GROUPS] = {
   REALTEK_RTD129X_MISC_BASE,
   REALTEK_RTD129X_ISO_BASE,
+};
+static const struct realtek_gpio_group realtek_rtd139x_groups[1] = {
+  {
+    REALTEK_RTD139X_ISO_PIN_BASE,
+    REALTEK_RTD139X_ISO_PIN_END,
+    0,
+    realtek_rtd129x_iso_dir,
+    realtek_rtd129x_iso_dato,
+    realtek_rtd129x_iso_dati,
+  },
+};
+static const off_t realtek_gpio_base_rtd139x[REALTEK_GPIO_GROUPS] = {
+  REALTEK_RTD139X_ISO_BASE,
+  0,
 };
 static const struct realtek_gpio_group *realtek_gpio_groups = realtek_rtd129x_groups;
 static const off_t *realtek_gpio_base = realtek_gpio_base_rtd129x;
@@ -2997,6 +3014,10 @@ struct BPIBoards bpiboard [] =
   { "bananapiw2",  13001, BPI_MODEL_W2, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_W2, physToGpio_BPI_W2, pinTobcm_BPI_W2, W2_I2C_DEV, W2_SPI_DEV, {W2_PWM_OFFSET,W2_I2C_OFFSET,W2_SPI_OFFSET} },
   { "bananapi-w2", 13001, BPI_MODEL_W2, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_W2, physToGpio_BPI_W2, pinTobcm_BPI_W2, W2_I2C_DEV, W2_SPI_DEV, {W2_PWM_OFFSET,W2_I2C_OFFSET,W2_SPI_OFFSET} },
   { "banana-pi-w2", 13001, BPI_MODEL_W2, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_W2, physToGpio_BPI_W2, pinTobcm_BPI_W2, W2_I2C_DEV, W2_SPI_DEV, {W2_PWM_OFFSET,W2_I2C_OFFSET,W2_SPI_OFFSET} },
+  { "bpi-m4",      13101, BPI_MODEL_M4, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M4, physToGpio_BPI_M4, pinTobcm_BPI_M4, M4_I2C_DEV, M4_SPI_DEV, {M4_PWM_OFFSET,M4_I2C_OFFSET,M4_SPI_OFFSET} },
+  { "bananapim4",  13101, BPI_MODEL_M4, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M4, physToGpio_BPI_M4, pinTobcm_BPI_M4, M4_I2C_DEV, M4_SPI_DEV, {M4_PWM_OFFSET,M4_I2C_OFFSET,M4_SPI_OFFSET} },
+  { "bananapi-m4", 13101, BPI_MODEL_M4, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M4, physToGpio_BPI_M4, pinTobcm_BPI_M4, M4_I2C_DEV, M4_SPI_DEV, {M4_PWM_OFFSET,M4_I2C_OFFSET,M4_SPI_OFFSET} },
+  { "banana-pi-m4", 13101, BPI_MODEL_M4, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M4, physToGpio_BPI_M4, pinTobcm_BPI_M4, M4_I2C_DEV, M4_SPI_DEV, {M4_PWM_OFFSET,M4_I2C_OFFSET,M4_SPI_OFFSET} },
   { "bpi-r2",	   11101, BPI_MODEL_R2, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R2, physToGpio_BPI_R2, pinTobcm_BPI_R2, R2_I2C_DEV, R2_SPI_DEV, {R2_PWM_OFFSET,R2_I2C_OFFSET,R2_SPI_OFFSET} },
   { NULL,		0, 0, 1, 2, 5, 0, NULL, NULL, NULL, NULL, NULL, {-1, -1, -1} },
 } ;
@@ -3054,12 +3075,20 @@ static int bpi_model_is_rockchip(int model)
 
 static int bpi_model_is_realtek(int model)
 {
-  return model == BPI_MODEL_W2;
+  return model == BPI_MODEL_W2 ||
+      model == BPI_MODEL_M4;
 }
 
 static void bpi_select_realtek_backend(int model)
 {
-  (void)model;
+  if (model == BPI_MODEL_M4)
+  {
+    realtek_gpio_base = realtek_gpio_base_rtd139x;
+    realtek_gpio_groups = realtek_rtd139x_groups;
+    realtek_gpio_group_count = 1;
+    realtek_gpio_map_size = REALTEK_GPIO_MAP_SIZE;
+    return;
+  }
 
   realtek_gpio_base = realtek_gpio_base_rtd129x;
   realtek_gpio_groups = realtek_rtd129x_groups;
@@ -3227,6 +3256,15 @@ static struct BPIBoards *bpi_find_board_by_model_string(const char *hardware)
       strstr(hardware, "armsom,sige3") ||
       strstr(hardware, "rk3568-armsom-sige3"))
     return bpi_find_board_by_name("bpi-m4-super");
+
+  if (strstr(hardware, "Sinovoip_Bananapi_M4") ||
+      strstr(hardware, "Banana Pi BPI-M4") ||
+      strstr(hardware, "BananaPi BPI-M4") ||
+      strstr(hardware, "Banana Pi M4") ||
+      strstr(hardware, "BananaPi M4") ||
+      strstr(hardware, "BPI-M4") ||
+      strstr(hardware, "rtd-1395-bananapi-m4"))
+    return bpi_find_board_by_name("bpi-m4");
 
   if (strstr(hardware, "Banana Pi BPI-M1 Super") ||
       strstr(hardware, "BananaPi BPI-M1 Super") ||
