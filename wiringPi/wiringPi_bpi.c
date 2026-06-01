@@ -129,6 +129,17 @@ int *pinTobcm_BP ;
 #define MTK_GPIO_MODE_PINS_PER_REG   5
 #define MTK_GPIO_FIELD_PINS_PER_REG  16
 
+// MT7988/MT7986 pinctrl GPIO register layout from mainline/vendor DTS.
+#define MTK_V2_GPIO_BASE_BP          (0x1001F000)
+#define MTK_V2_GPIO_DIR              (0x00)
+#define MTK_V2_GPIO_DOUT             (0x100)
+#define MTK_V2_GPIO_DIN              (0x200)
+#define MTK_V2_GPIO_MODE             (0x300)
+#define MTK_V2_GPIO_MAP_SIZE         (4 * 1024)
+#define MTK_V2_MODE_PINS_PER_REG     8
+#define MTK_V2_MODE_BITS             4
+#define MTK_V2_FIELD_PINS_PER_REG    32
+
 //Amlogic Meson G12B/SM1 GPIO
 #define MESON_GPIO_BASE_BP        (0xFF634000)
 #define MESON_GPIO_AO_BASE_BP     (0xFF800000)
@@ -339,6 +350,7 @@ struct realtek_gpio_group
 
 static int wiringPinMode = WPI_MODE_UNINITIALISED ;
 static int bpi_found_mtk = 0 ;
+static int bpi_found_mtk_v2 = 0 ;
 static int bpi_found_sun50iw9 = 0 ;
 static int bpi_found_meson = 0 ;
 static int bpi_found_spacemit = 0 ;
@@ -348,6 +360,7 @@ static int bpi_found_realtek = 0 ;
 static int bpi_found_vs680 = 0 ;
 static int bpi_found_sp7021 = 0 ;
 static uint8_t *mtk_gpio_base = NULL ;
+static uint8_t *mtk_v2_gpio_base = NULL ;
 static volatile uint32_t *meson_gpio = NULL ;
 static volatile uint32_t *meson_gpioao = NULL ;
 static volatile uint32_t *spacemit_gpio = NULL ;
@@ -1319,6 +1332,113 @@ static void mtk_pullUpDnControl(int pin, int pud)
 
   mtk_gpio_update_bit(mtk_gpio_field_offset(MTK_GPIO_PULLSEL, pin), shift, pud == PUD_UP);
   mtk_gpio_update_bit(mtk_gpio_field_offset(MTK_GPIO_PULLE, pin), shift, 1);
+}
+
+static volatile uint32_t *mtk_v2_gpio_reg(unsigned int offset)
+{
+  return (volatile uint32_t *)(mtk_v2_gpio_base + offset);
+}
+
+static int mtk_v2_gpio_mapped(void)
+{
+  return mtk_v2_gpio_base != NULL;
+}
+
+static unsigned int mtk_v2_gpio_field_offset(unsigned int base, unsigned int pin)
+{
+  return base + (pin / MTK_V2_FIELD_PINS_PER_REG) * 0x10;
+}
+
+static unsigned int mtk_v2_gpio_field_shift(unsigned int pin)
+{
+  return pin % MTK_V2_FIELD_PINS_PER_REG;
+}
+
+static void mtk_v2_gpio_update_bit(unsigned int offset, unsigned int shift, int value)
+{
+  uint32_t regval;
+  volatile uint32_t *reg;
+
+  if (!mtk_v2_gpio_mapped())
+    return;
+
+  reg = mtk_v2_gpio_reg(offset);
+  regval = *reg;
+  if (value)
+    regval |= (1u << shift);
+  else
+    regval &= ~(1u << shift);
+  *reg = regval;
+}
+
+static void mtk_v2_set_pin_mode(int pin, int mode)
+{
+  uint32_t regval;
+  unsigned int shift;
+  volatile uint32_t *reg;
+
+  if (!mtk_v2_gpio_mapped())
+    return;
+
+  reg = mtk_v2_gpio_reg(MTK_V2_GPIO_MODE + (pin / MTK_V2_MODE_PINS_PER_REG) * 0x10);
+  shift = (pin % MTK_V2_MODE_PINS_PER_REG) * MTK_V2_MODE_BITS;
+  regval = *reg;
+  regval &= ~(0xfu << shift);
+  regval |= ((mode & 0xfu) << shift);
+  *reg = regval;
+}
+
+static int mtk_v2_get_pin_mode(int pin)
+{
+  uint32_t mode;
+  unsigned int offset;
+  unsigned int shift;
+
+  if (!mtk_v2_gpio_mapped())
+    return 0;
+
+  offset = MTK_V2_GPIO_MODE + (pin / MTK_V2_MODE_PINS_PER_REG) * 0x10;
+  shift = (pin % MTK_V2_MODE_PINS_PER_REG) * MTK_V2_MODE_BITS;
+  mode = (*mtk_v2_gpio_reg(offset) >> shift) & 0xfu;
+  if (mode != 0)
+    return mode;
+
+  offset = mtk_v2_gpio_field_offset(MTK_V2_GPIO_DIR, pin);
+  shift = mtk_v2_gpio_field_shift(pin);
+  return ((*mtk_v2_gpio_reg(offset) >> shift) & 0x1u) ? OUTPUT : INPUT;
+}
+
+static void mtk_v2_set_pin_direction(int pin, int mode)
+{
+  if (!mtk_v2_gpio_mapped())
+    return;
+
+  mtk_v2_gpio_update_bit(mtk_v2_gpio_field_offset(MTK_V2_GPIO_DIR, pin),
+                         mtk_v2_gpio_field_shift(pin), mode == OUTPUT);
+}
+
+static int mtk_v2_digitalRead(int pin)
+{
+  if (!mtk_v2_gpio_mapped())
+    return LOW;
+
+  return ((*mtk_v2_gpio_reg(mtk_v2_gpio_field_offset(MTK_V2_GPIO_DIN, pin)) >>
+           mtk_v2_gpio_field_shift(pin)) & 0x1u) ? HIGH : LOW;
+}
+
+static void mtk_v2_digitalWrite(int pin, int value)
+{
+  if (!mtk_v2_gpio_mapped())
+    return;
+
+  mtk_v2_gpio_update_bit(mtk_v2_gpio_field_offset(MTK_V2_GPIO_DOUT, pin),
+                         mtk_v2_gpio_field_shift(pin), value == HIGH);
+}
+
+static void mtk_v2_pullUpDnControl(int pin, int pud)
+{
+  (void)pin;
+  (void)pud;
 }
 
 static int meson_gpio_mapped(void)
@@ -2451,6 +2571,8 @@ int bpi_getAlt (int pin)
   }
   if (bpi_found_mtk)
     return mtk_get_pin_mode(pin);
+  if (bpi_found_mtk_v2)
+    return mtk_v2_get_pin_mode(pin);
   if (bpi_found_meson)
     return meson_get_pin_mode(pin);
   if (bpi_found_spacemit)
@@ -2473,7 +2595,7 @@ int bpi_getAlt (int pin)
 
 void bpi_pwmSetMode (int mode)
 {
-  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek || bpi_found_vs680 || bpi_found_sp7021)
+  if (bpi_found_mtk || bpi_found_mtk_v2 || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek || bpi_found_vs680 || bpi_found_sp7021)
     return;
 
   sunxi_pwm_set_mode(mode);
@@ -2483,7 +2605,7 @@ void bpi_pwmSetMode (int mode)
 
 void bpi_pwmSetRange (unsigned int range)
 {
-  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek || bpi_found_vs680 || bpi_found_sp7021)
+  if (bpi_found_mtk || bpi_found_mtk_v2 || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek || bpi_found_vs680 || bpi_found_sp7021)
     return;
 
   sunxi_pwm_set_period(range);
@@ -2493,7 +2615,7 @@ void bpi_pwmSetRange (unsigned int range)
 
 void bpi_pwmSetClock (int divisor)
 {
-  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek || bpi_found_vs680 || bpi_found_sp7021)
+  if (bpi_found_mtk || bpi_found_mtk_v2 || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek || bpi_found_vs680 || bpi_found_sp7021)
     return;
 
   sunxi_pwm_set_clk(divisor);
@@ -2566,6 +2688,11 @@ void bpi_pinModeAlt (int pin, int mode)
     if (bpi_found_mtk)
     {
       mtk_set_pin_mode(pin, mode);
+      return;
+    }
+    if (bpi_found_mtk_v2)
+    {
+      mtk_v2_set_pin_mode(pin, mode);
       return;
     }
     if (bpi_found_meson)
@@ -2651,6 +2778,25 @@ void bpi_pinMode (int pin, int mode)
       else if (mode == PULLOFF)
       {
         mtk_pullUpDnControl(pin, PUD_OFF);
+      }
+      else
+      {
+        return;
+      }
+      wiringPinMode = mode;
+      return;
+    }
+
+    if (bpi_found_mtk_v2)
+    {
+      if (mode == INPUT || mode == OUTPUT)
+      {
+        mtk_v2_set_pin_mode(pin, 0);
+        mtk_v2_set_pin_direction(pin, mode);
+      }
+      else if (mode == PULLUP || mode == PULLDOWN || mode == PULLOFF)
+      {
+        mtk_v2_pullUpDnControl(pin, mode == PULLUP ? PUD_UP : (mode == PULLDOWN ? PUD_DOWN : PUD_OFF));
       }
       else
       {
@@ -2937,6 +3083,11 @@ void bpi_pullUpDnControl (int pin, int pud)
       mtk_pullUpDnControl(pin, pud);
       return;
     }
+    if (bpi_found_mtk_v2)
+    {
+      mtk_v2_pullUpDnControl(pin, pud);
+      return;
+    }
     if (bpi_found_meson)
     {
       meson_pullUpDnControl(pin, pud);
@@ -3032,6 +3183,8 @@ int bpi_digitalRead (int pin)
     }
     if (bpi_found_mtk)
       return mtk_digitalRead(pin);
+    if (bpi_found_mtk_v2)
+      return mtk_v2_digitalRead(pin);
     if (bpi_found_meson)
       return meson_digitalRead(pin);
     if (bpi_found_spacemit)
@@ -3107,6 +3260,11 @@ void bpi_digitalWrite (int pin, int value)
       mtk_digitalWrite(pin, value);
       return;
     }
+    if (bpi_found_mtk_v2)
+    {
+      mtk_v2_digitalWrite(pin, value);
+      return;
+    }
     if (bpi_found_meson)
     {
       meson_digitalWrite(pin, value);
@@ -3158,7 +3316,7 @@ void bpi_pwmWrite (int pin, int value)
 
   uint32_t a_val = 0;
 
-  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek || bpi_found_vs680 || bpi_found_sp7021)
+  if (bpi_found_mtk || bpi_found_mtk_v2 || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek || bpi_found_vs680 || bpi_found_sp7021)
     return;
 
   if(pwmmode==1)//sycle
@@ -3441,6 +3599,10 @@ struct BPIBoards bpiboard [] =
   { "bananapif2p", 13401, BPI_MODEL_F2P, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_F2S_F2P, physToGpio_BPI_F2S_F2P, pinTobcm_BPI_F2S_F2P, F2S_F2P_I2C_DEV, F2S_F2P_SPI_DEV, {F2S_F2P_PWM_OFFSET,F2S_F2P_I2C_OFFSET,F2S_F2P_SPI_OFFSET} },
   { "bananapi-f2p", 13401, BPI_MODEL_F2P, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_F2S_F2P, physToGpio_BPI_F2S_F2P, pinTobcm_BPI_F2S_F2P, F2S_F2P_I2C_DEV, F2S_F2P_SPI_DEV, {F2S_F2P_PWM_OFFSET,F2S_F2P_I2C_OFFSET,F2S_F2P_SPI_OFFSET} },
   { "banana-pi-f2p", 13401, BPI_MODEL_F2P, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_F2S_F2P, physToGpio_BPI_F2S_F2P, pinTobcm_BPI_F2S_F2P, F2S_F2P_I2C_DEV, F2S_F2P_SPI_DEV, {F2S_F2P_PWM_OFFSET,F2S_F2P_I2C_OFFSET,F2S_F2P_SPI_OFFSET} },
+  { "bpi-r4",      13601, BPI_MODEL_R4, 1, 4, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R4, physToGpio_BPI_R4, pinTobcm_BPI_R4, R4_I2C_DEV, R4_SPI_DEV, {R4_PWM_OFFSET,R4_I2C_OFFSET,R4_SPI_OFFSET} },
+  { "bananapir4",  13601, BPI_MODEL_R4, 1, 4, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R4, physToGpio_BPI_R4, pinTobcm_BPI_R4, R4_I2C_DEV, R4_SPI_DEV, {R4_PWM_OFFSET,R4_I2C_OFFSET,R4_SPI_OFFSET} },
+  { "bananapi-r4", 13601, BPI_MODEL_R4, 1, 4, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R4, physToGpio_BPI_R4, pinTobcm_BPI_R4, R4_I2C_DEV, R4_SPI_DEV, {R4_PWM_OFFSET,R4_I2C_OFFSET,R4_SPI_OFFSET} },
+  { "banana-pi-r4", 13601, BPI_MODEL_R4, 1, 4, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R4, physToGpio_BPI_R4, pinTobcm_BPI_R4, R4_I2C_DEV, R4_SPI_DEV, {R4_PWM_OFFSET,R4_I2C_OFFSET,R4_SPI_OFFSET} },
   { "bpi-r2",	   11101, BPI_MODEL_R2, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R2, physToGpio_BPI_R2, pinTobcm_BPI_R2, R2_I2C_DEV, R2_SPI_DEV, {R2_PWM_OFFSET,R2_I2C_OFFSET,R2_SPI_OFFSET} },
   { NULL,		0, 0, 1, 2, 5, 0, NULL, NULL, NULL, NULL, NULL, {-1, -1, -1} },
 } ;
@@ -3809,6 +3971,15 @@ static struct BPIBoards *bpi_find_board_by_model_string(const char *hardware)
       strstr(hardware, "BPI-AI2N"))
     return bpi_find_board_by_name("bpi-ai2n");
 
+  if (strstr(hardware, "Bananapi BPI-R4") ||
+      strstr(hardware, "BananaPi BPI-R4") ||
+      strstr(hardware, "Banana Pi BPI-R4") ||
+      strstr(hardware, "BananaPi R4") ||
+      strstr(hardware, "Banana Pi R4") ||
+      strstr(hardware, "BPI-R4") ||
+      strstr(hardware, "mt7988a-bananapi-bpi-r4"))
+    return bpi_find_board_by_name("bpi-r4");
+
   if (strstr(hardware, "Bananapi-R2 Pro") ||
       strstr(hardware, "BananaPi BPI-R2 Pro") ||
       strstr(hardware, "Banana Pi BPI-R2 Pro") ||
@@ -3848,6 +4019,7 @@ int bpi_piGpioLayout (void)
 
   bpi_found = 0; // -1: not init, 0: init but not found, 1: found
   bpi_found_mtk = 0;
+  bpi_found_mtk_v2 = 0;
   bpi_found_sun50iw9 = 0;
   bpi_found_meson = 0;
   bpi_found_spacemit = 0;
@@ -3907,6 +4079,7 @@ void bpi_piBoardId (int *model, int *rev, int *mem, int *maker, int *warranty)
     physToGpio_BP = board->physToGpio ;
     pinTobcm_BP = board->pinTobcm ;
     bpi_found_mtk = (board->model == BPI_MODEL_R2);
+    bpi_found_mtk_v2 = (board->model == BPI_MODEL_R4);
     bpi_found_sun50iw9 = (board->model == BPI_MODEL_M4BERRY || board->model == BPI_MODEL_M4ZERO);
     bpi_found_meson = (board->model == BPI_MODEL_M2S ||
                        board->model == BPI_MODEL_CM4IO ||
@@ -3964,6 +4137,19 @@ int bpi_wiringPiSetup (void)
     {
       mtk_gpio_base = NULL;
       return wiringPiFailure (WPI_ALMOST,"wiringPiSetup: mmap (MTK GPIO) failed: %s\n", strerror (errno)) ;
+    }
+    initialiseEpoch () ;
+    return 0 ;
+  }
+
+  if (bpi_found_mtk_v2)
+  {
+    mtk_v2_gpio_base = (uint8_t *)mmap(0, MTK_V2_GPIO_MAP_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, MTK_V2_GPIO_BASE_BP);
+    close(fd);
+    if (mtk_v2_gpio_base == MAP_FAILED)
+    {
+      mtk_v2_gpio_base = NULL;
+      return wiringPiFailure (WPI_ALMOST,"wiringPiSetup: mmap (MTK GPIO v2) failed: %s\n", strerror (errno)) ;
     }
     initialiseEpoch () ;
     return 0 ;

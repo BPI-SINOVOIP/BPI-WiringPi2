@@ -767,4 +767,5 @@ const int physToGpio_BP [64] =
 #include "bpi-m6.h"
 #include "bpi-f2s-f2p.h"
 #include "bpi-cm6.h"
+#include "bpi-r4.h"
 #endif
