@@ -47,7 +47,8 @@
 #define BPI_MODEL_M2U_V40    75
 #define BPI_MODEL_M2Z        76
 #define BPI_MODEL_R2         77
-#define BPI_MODELS_MAX       80
+#define BPI_MODEL_M2M_V11    78
+#define BPI_MODELS_MAX       81
 
 #define BPI_MAKER_SINOVOIP    6
 

@@ -388,6 +388,7 @@ const char *piModelNames [PI_MODELS_MAX] =
   [BPI_MODEL_M2U_V40] = "Banana Pi M2 Ultra[V40]",
   [BPI_MODEL_M2Z]     = "Banana Pi M2 Zero[H2+/H3]",
   [BPI_MODEL_R2]      = "Banana Pi R2[MT7623N]",
+  [BPI_MODEL_M2M_V11] = "Banana Pi M2 Magic v1.1[R16]",
 #endif
 } ;
 
