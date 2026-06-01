@@ -1117,9 +1117,9 @@ void bpi_pullUpDnControl (int pin, int pud)
   if ((pin & PI_GPIO_MASK) == 0)		// On-Board Pin
   {
     /**/ if (wiringPiMode == WPI_MODE_PINS)
-      pin = pinToGpio [pin] ;
+      pin = pinToGpio_BP [pin] ;
     else if (wiringPiMode == WPI_MODE_PHYS)
-      pin = physToGpio [pin] ;
+      pin = physToGpio_BP [pin] ;
     else if (wiringPiMode == WPI_MODE_GPIO)
      pin = pinTobcm_BP[pin];//need map A20 to bcm
     else 
@@ -1236,9 +1236,9 @@ void bpi_digitalWrite (int pin, int value)
       return ;
     }
     else if (wiringPiMode == WPI_MODE_PINS)
-      pin = pinToGpio [pin] ;
+      pin = pinToGpio_BP [pin] ;
     else if (wiringPiMode == WPI_MODE_PHYS)
-      pin = physToGpio [pin] ;
+      pin = physToGpio_BP [pin] ;
     else if (wiringPiMode == WPI_MODE_GPIO)
      pin=pinTobcm_BP[pin];//need map A20 to bcm
     else  return ;
