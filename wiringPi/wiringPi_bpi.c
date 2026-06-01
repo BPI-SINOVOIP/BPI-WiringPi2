@@ -129,6 +129,52 @@ int *pinTobcm_BP ;
 #define MTK_GPIO_MODE_PINS_PER_REG   5
 #define MTK_GPIO_FIELD_PINS_PER_REG  16
 
+//Amlogic Meson G12B/SM1 GPIO
+#define MESON_GPIO_BASE_BP        (0xFF634000)
+#define MESON_GPIO_AO_BASE_BP     (0xFF800000)
+#define MESON_GPIO_PIN_BASE       410
+#define MESON_GPIOH_PIN_START     (MESON_GPIO_PIN_BASE + 17)
+#define MESON_GPIOH_PIN_END       (MESON_GPIO_PIN_BASE + 25)
+#define MESON_GPIOA_PIN_START     (MESON_GPIO_PIN_BASE + 50)
+#define MESON_GPIOA_PIN_END       (MESON_GPIO_PIN_BASE + 65)
+#define MESON_GPIOX_PIN_START     (MESON_GPIO_PIN_BASE + 66)
+#define MESON_GPIOX_PIN_MID       (MESON_GPIO_PIN_BASE + 81)
+#define MESON_GPIOX_PIN_END       (MESON_GPIO_PIN_BASE + 85)
+#define MESON_GPIOAO_PIN_START    (MESON_GPIO_PIN_BASE + 86)
+#define MESON_GPIOAO_PIN_END      (MESON_GPIO_PIN_BASE + 97)
+
+#define MESON_GPIOH_FSEL_REG_OFFSET    0x119
+#define MESON_GPIOH_OUTP_REG_OFFSET    0x11A
+#define MESON_GPIOH_INP_REG_OFFSET     0x11B
+#define MESON_GPIOH_PUPD_REG_OFFSET    0x13D
+#define MESON_GPIOH_PUEN_REG_OFFSET    0x14B
+#define MESON_GPIOH_MUX_B_REG_OFFSET   0x1BB
+
+#define MESON_GPIOA_FSEL_REG_OFFSET    0x120
+#define MESON_GPIOA_OUTP_REG_OFFSET    0x121
+#define MESON_GPIOA_INP_REG_OFFSET     0x122
+#define MESON_GPIOA_PUPD_REG_OFFSET    0x13F
+#define MESON_GPIOA_PUEN_REG_OFFSET    0x14D
+#define MESON_GPIOA_MUX_D_REG_OFFSET   0x1BD
+#define MESON_GPIOA_MUX_E_REG_OFFSET   0x1BE
+
+#define MESON_GPIOX_FSEL_REG_OFFSET    0x116
+#define MESON_GPIOX_OUTP_REG_OFFSET    0x117
+#define MESON_GPIOX_INP_REG_OFFSET     0x118
+#define MESON_GPIOX_PUPD_REG_OFFSET    0x13C
+#define MESON_GPIOX_PUEN_REG_OFFSET    0x14A
+#define MESON_GPIOX_MUX_3_REG_OFFSET   0x1B3
+#define MESON_GPIOX_MUX_4_REG_OFFSET   0x1B4
+#define MESON_GPIOX_MUX_5_REG_OFFSET   0x1B5
+
+#define MESON_GPIOAO_FSEL_REG_OFFSET   0x109
+#define MESON_GPIOAO_OUTP_REG_OFFSET   0x10D
+#define MESON_GPIOAO_INP_REG_OFFSET    0x10A
+#define MESON_GPIOAO_PUPD_REG_OFFSET   0x10B
+#define MESON_GPIOAO_PUEN_REG_OFFSET   0x10C
+#define MESON_GPIOAO_MUX_REG0_OFFSET   0x105
+#define MESON_GPIOAO_MUX_REG1_OFFSET   0x106
+
 //sunxi_pwm, only use ch0
 #define SUNXI_PWM_BASE        (0x01c21400)
 #define SUNXI_PWM_CH0_CTRL    (SUNXI_PWM_BASE)
@@ -165,7 +211,10 @@ int *pinTobcm_BP ;
 static int wiringPinMode = WPI_MODE_UNINITIALISED ;
 static int bpi_found_mtk = 0 ;
 static int bpi_found_sun50iw9 = 0 ;
+static int bpi_found_meson = 0 ;
 static uint8_t *mtk_gpio_base = NULL ;
+static volatile uint32_t *meson_gpio = NULL ;
+static volatile uint32_t *meson_gpioao = NULL ;
 
 
 static int syspin [64] =
@@ -1026,6 +1075,235 @@ static void mtk_pullUpDnControl(int pin, int pud)
   mtk_gpio_update_bit(mtk_gpio_field_offset(MTK_GPIO_PULLE, pin), shift, 1);
 }
 
+static int meson_gpio_mapped(void)
+{
+  return meson_gpio != NULL && meson_gpioao != NULL;
+}
+
+static int meson_is_ao_pin(int pin)
+{
+  return pin >= MESON_GPIOAO_PIN_START && pin <= MESON_GPIOAO_PIN_END;
+}
+
+static volatile uint32_t *meson_gpio_regs(int pin)
+{
+  return meson_is_ao_pin(pin) ? meson_gpioao : meson_gpio;
+}
+
+static int meson_gpio_shift(int pin)
+{
+  if (pin >= MESON_GPIOH_PIN_START && pin <= MESON_GPIOH_PIN_END)
+    return pin - MESON_GPIOH_PIN_START;
+  if (pin >= MESON_GPIOA_PIN_START && pin <= MESON_GPIOA_PIN_END)
+    return pin - MESON_GPIOA_PIN_START;
+  if (pin >= MESON_GPIOX_PIN_START && pin <= MESON_GPIOX_PIN_END)
+    return pin - MESON_GPIOX_PIN_START;
+  if (pin >= MESON_GPIOAO_PIN_START && pin <= MESON_GPIOAO_PIN_END)
+    return pin - MESON_GPIOAO_PIN_START;
+
+  return -1;
+}
+
+static int meson_gpio_fsel_offset(int pin)
+{
+  if (pin >= MESON_GPIOH_PIN_START && pin <= MESON_GPIOH_PIN_END)
+    return MESON_GPIOH_FSEL_REG_OFFSET;
+  if (pin >= MESON_GPIOA_PIN_START && pin <= MESON_GPIOA_PIN_END)
+    return MESON_GPIOA_FSEL_REG_OFFSET;
+  if (pin >= MESON_GPIOX_PIN_START && pin <= MESON_GPIOX_PIN_END)
+    return MESON_GPIOX_FSEL_REG_OFFSET;
+  if (pin >= MESON_GPIOAO_PIN_START && pin <= MESON_GPIOAO_PIN_END)
+    return MESON_GPIOAO_FSEL_REG_OFFSET;
+
+  return -1;
+}
+
+static int meson_gpio_out_offset(int pin)
+{
+  if (pin >= MESON_GPIOH_PIN_START && pin <= MESON_GPIOH_PIN_END)
+    return MESON_GPIOH_OUTP_REG_OFFSET;
+  if (pin >= MESON_GPIOA_PIN_START && pin <= MESON_GPIOA_PIN_END)
+    return MESON_GPIOA_OUTP_REG_OFFSET;
+  if (pin >= MESON_GPIOX_PIN_START && pin <= MESON_GPIOX_PIN_END)
+    return MESON_GPIOX_OUTP_REG_OFFSET;
+  if (pin >= MESON_GPIOAO_PIN_START && pin <= MESON_GPIOAO_PIN_END)
+    return MESON_GPIOAO_OUTP_REG_OFFSET;
+
+  return -1;
+}
+
+static int meson_gpio_in_offset(int pin)
+{
+  if (pin >= MESON_GPIOH_PIN_START && pin <= MESON_GPIOH_PIN_END)
+    return MESON_GPIOH_INP_REG_OFFSET;
+  if (pin >= MESON_GPIOA_PIN_START && pin <= MESON_GPIOA_PIN_END)
+    return MESON_GPIOA_INP_REG_OFFSET;
+  if (pin >= MESON_GPIOX_PIN_START && pin <= MESON_GPIOX_PIN_END)
+    return MESON_GPIOX_INP_REG_OFFSET;
+  if (pin >= MESON_GPIOAO_PIN_START && pin <= MESON_GPIOAO_PIN_END)
+    return MESON_GPIOAO_INP_REG_OFFSET;
+
+  return -1;
+}
+
+static int meson_gpio_puen_offset(int pin)
+{
+  if (pin >= MESON_GPIOH_PIN_START && pin <= MESON_GPIOH_PIN_END)
+    return MESON_GPIOH_PUEN_REG_OFFSET;
+  if (pin >= MESON_GPIOA_PIN_START && pin <= MESON_GPIOA_PIN_END)
+    return MESON_GPIOA_PUEN_REG_OFFSET;
+  if (pin >= MESON_GPIOX_PIN_START && pin <= MESON_GPIOX_PIN_END)
+    return MESON_GPIOX_PUEN_REG_OFFSET;
+  if (pin >= MESON_GPIOAO_PIN_START && pin <= MESON_GPIOAO_PIN_END)
+    return MESON_GPIOAO_PUEN_REG_OFFSET;
+
+  return -1;
+}
+
+static int meson_gpio_pupd_offset(int pin)
+{
+  if (pin >= MESON_GPIOH_PIN_START && pin <= MESON_GPIOH_PIN_END)
+    return MESON_GPIOH_PUPD_REG_OFFSET;
+  if (pin >= MESON_GPIOA_PIN_START && pin <= MESON_GPIOA_PIN_END)
+    return MESON_GPIOA_PUPD_REG_OFFSET;
+  if (pin >= MESON_GPIOX_PIN_START && pin <= MESON_GPIOX_PIN_END)
+    return MESON_GPIOX_PUPD_REG_OFFSET;
+  if (pin >= MESON_GPIOAO_PIN_START && pin <= MESON_GPIOAO_PIN_END)
+    return MESON_GPIOAO_PUPD_REG_OFFSET;
+
+  return -1;
+}
+
+static int meson_gpio_mux_offset(int pin)
+{
+  if (pin >= MESON_GPIOH_PIN_START && pin <= MESON_GPIOH_PIN_END)
+    return MESON_GPIOH_MUX_B_REG_OFFSET;
+  if (pin >= MESON_GPIOA_PIN_START && pin <= MESON_GPIOA_PIN_START + 7)
+    return MESON_GPIOA_MUX_D_REG_OFFSET;
+  if (pin >= MESON_GPIOA_PIN_START + 8 && pin <= MESON_GPIOA_PIN_END)
+    return MESON_GPIOA_MUX_E_REG_OFFSET;
+  if (pin >= MESON_GPIOX_PIN_START && pin <= MESON_GPIOX_PIN_START + 7)
+    return MESON_GPIOX_MUX_3_REG_OFFSET;
+  if (pin >= MESON_GPIOX_PIN_START + 8 && pin <= MESON_GPIOX_PIN_MID)
+    return MESON_GPIOX_MUX_4_REG_OFFSET;
+  if (pin > MESON_GPIOX_PIN_MID && pin <= MESON_GPIOX_PIN_END)
+    return MESON_GPIOX_MUX_5_REG_OFFSET;
+  if (pin >= MESON_GPIOAO_PIN_START && pin <= MESON_GPIOAO_PIN_START + 7)
+    return MESON_GPIOAO_MUX_REG0_OFFSET;
+  if (pin >= MESON_GPIOAO_PIN_START + 8 && pin <= MESON_GPIOAO_PIN_END)
+    return MESON_GPIOAO_MUX_REG1_OFFSET;
+
+  return -1;
+}
+
+static void meson_update_reg(int pin, int offset, uint32_t clear, uint32_t set)
+{
+  uint32_t regval;
+  volatile uint32_t *reg;
+
+  if (!meson_gpio_mapped() || offset < 0)
+    return;
+
+  reg = meson_gpio_regs(pin) + offset;
+  regval = *reg;
+  regval &= ~clear;
+  regval |= set;
+  *reg = regval;
+}
+
+static void meson_set_pin_alt(int pin, int mode)
+{
+  int shift = meson_gpio_shift(pin);
+  int mux = meson_gpio_mux_offset(pin);
+  unsigned int mux_shift;
+  uint32_t alt;
+
+  if (!meson_gpio_mapped() || shift < 0 || mux < 0)
+    return;
+
+  alt = mode > 1 ? (uint32_t)(mode - 1) : (uint32_t)mode;
+  mux_shift = (unsigned int)(shift & 0x7) * 4;
+  meson_update_reg(pin, mux, 0xFu << mux_shift, (alt & 0xFu) << mux_shift);
+}
+
+static void meson_set_pin_mode(int pin, int mode)
+{
+  int shift = meson_gpio_shift(pin);
+  int mux = meson_gpio_mux_offset(pin);
+  int fsel = meson_gpio_fsel_offset(pin);
+  unsigned int mux_shift;
+
+  if (!meson_gpio_mapped() || shift < 0 || mux < 0 || fsel < 0)
+    return;
+
+  mux_shift = (unsigned int)(shift & 0x7) * 4;
+  meson_update_reg(pin, mux, 0xFu << mux_shift, 0);
+  if (mode == INPUT)
+    meson_update_reg(pin, fsel, 0, 1u << shift);
+  else if (mode == OUTPUT)
+    meson_update_reg(pin, fsel, 1u << shift, 0);
+}
+
+static int meson_get_pin_mode(int pin)
+{
+  int shift = meson_gpio_shift(pin);
+  int mux = meson_gpio_mux_offset(pin);
+  int fsel = meson_gpio_fsel_offset(pin);
+  unsigned int mux_shift;
+  uint32_t mode;
+
+  if (!meson_gpio_mapped() || shift < 0 || mux < 0 || fsel < 0)
+    return 0;
+
+  mux_shift = (unsigned int)(shift & 0x7) * 4;
+  mode = (*(meson_gpio_regs(pin) + mux) >> mux_shift) & 0xFu;
+  if (mode != 0)
+    return (int)mode + 1;
+
+  return (*(meson_gpio_regs(pin) + fsel) & (1u << shift)) ? INPUT : OUTPUT;
+}
+
+static void meson_pullUpDnControl(int pin, int pud)
+{
+  int shift = meson_gpio_shift(pin);
+  int puen = meson_gpio_puen_offset(pin);
+  int pupd = meson_gpio_pupd_offset(pin);
+
+  if (!meson_gpio_mapped() || shift < 0 || puen < 0 || pupd < 0)
+    return;
+
+  if (pud == PUD_OFF)
+  {
+    meson_update_reg(pin, puen, 1u << shift, 0);
+    return;
+  }
+
+  meson_update_reg(pin, pupd, 1u << shift, pud == PUD_UP ? 1u << shift : 0);
+  meson_update_reg(pin, puen, 0, 1u << shift);
+}
+
+static int meson_digitalRead(int pin)
+{
+  int shift = meson_gpio_shift(pin);
+  int offset = meson_gpio_in_offset(pin);
+
+  if (!meson_gpio_mapped() || shift < 0 || offset < 0)
+    return LOW;
+
+  return (*(meson_gpio_regs(pin) + offset) & (1u << shift)) ? HIGH : LOW;
+}
+
+static void meson_digitalWrite(int pin, int value)
+{
+  int shift = meson_gpio_shift(pin);
+  int offset = meson_gpio_out_offset(pin);
+
+  if (!meson_gpio_mapped() || shift < 0 || offset < 0)
+    return;
+
+  meson_update_reg(pin, offset, value == LOW ? 1u << shift : 0, value == LOW ? 0 : 1u << shift);
+}
+
 #ifdef BPI
 
 int bpi_getAlt (int pin)
@@ -1049,6 +1327,8 @@ int bpi_getAlt (int pin)
   }
   if (bpi_found_mtk)
     return mtk_get_pin_mode(pin);
+  if (bpi_found_meson)
+    return meson_get_pin_mode(pin);
 
   alt=sunxi_get_pin_mode(pin);
   return alt ;
@@ -1057,7 +1337,7 @@ int bpi_getAlt (int pin)
 
 void bpi_pwmSetMode (int mode)
 {
-  if (bpi_found_mtk || bpi_found_sun50iw9)
+  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson)
     return;
 
   sunxi_pwm_set_mode(mode);
@@ -1067,7 +1347,7 @@ void bpi_pwmSetMode (int mode)
 
 void bpi_pwmSetRange (unsigned int range)
 {
-  if (bpi_found_mtk || bpi_found_sun50iw9)
+  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson)
     return;
 
   sunxi_pwm_set_period(range);
@@ -1077,7 +1357,7 @@ void bpi_pwmSetRange (unsigned int range)
 
 void bpi_pwmSetClock (int divisor)
 {
-  if (bpi_found_mtk || bpi_found_sun50iw9)
+  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson)
     return;
 
   sunxi_pwm_set_clk(divisor);
@@ -1152,6 +1432,11 @@ void bpi_pinModeAlt (int pin, int mode)
       mtk_set_pin_mode(pin, mode);
       return;
     }
+    if (bpi_found_meson)
+    {
+      meson_set_pin_alt(pin, mode);
+      return;
+    }
     sunxi_set_pin_alt(pin,mode);
   }
 }
@@ -1200,6 +1485,32 @@ void bpi_pinMode (int pin, int mode)
       else if (mode == PULLOFF)
       {
         mtk_pullUpDnControl(pin, PUD_OFF);
+      }
+      else
+      {
+        return;
+      }
+      wiringPinMode = mode;
+      return;
+    }
+
+    if (bpi_found_meson)
+    {
+      if (mode == INPUT || mode == OUTPUT)
+      {
+        meson_set_pin_mode(pin, mode);
+      }
+      else if (mode == PULLUP)
+      {
+        meson_pullUpDnControl(pin, PUD_UP);
+      }
+      else if (mode == PULLDOWN)
+      {
+        meson_pullUpDnControl(pin, PUD_DOWN);
+      }
+      else if (mode == PULLOFF)
+      {
+        meson_pullUpDnControl(pin, PUD_OFF);
       }
       else
       {
@@ -1304,6 +1615,11 @@ void bpi_pullUpDnControl (int pin, int pud)
       mtk_pullUpDnControl(pin, pud);
       return;
     }
+    if (bpi_found_meson)
+    {
+      meson_pullUpDnControl(pin, pud);
+      return;
+    }
     sunxi_pullUpDnControl(pin, pud);
     return;
   }
@@ -1364,6 +1680,8 @@ int bpi_digitalRead (int pin)
     }
     if (bpi_found_mtk)
       return mtk_digitalRead(pin);
+    if (bpi_found_meson)
+      return meson_digitalRead(pin);
 
     return sunxi_digitalRead(pin);
   }
@@ -1425,6 +1743,11 @@ void bpi_digitalWrite (int pin, int value)
       mtk_digitalWrite(pin, value);
       return;
     }
+    if (bpi_found_meson)
+    {
+      meson_digitalWrite(pin, value);
+      return;
+    }
     sunxi_digitalWrite(pin, value); 
   }
   else
@@ -1441,9 +1764,7 @@ void bpi_pwmWrite (int pin, int value)
 
   uint32_t a_val = 0;
 
-  if (bpi_found_mtk)
-    return;
-  if (bpi_found_sun50iw9)
+  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson)
     return;
 
   if(pwmmode==1)//sycle
@@ -1608,6 +1929,10 @@ struct BPIBoards bpiboard [] =
   { "bpi-m4zero", 11301, BPI_MODEL_M4ZERO, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M4ZERO, physToGpio_BPI_M4ZERO, pinTobcm_BPI_M4ZERO, M4ZERO_I2C_DEV, M4ZERO_SPI_DEV, {M4ZERO_PWM_OFFSET,M4ZERO_I2C_OFFSET,M4ZERO_SPI_OFFSET} },
   { "bpi-m4-zero", 11301, BPI_MODEL_M4ZERO, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M4ZERO, physToGpio_BPI_M4ZERO, pinTobcm_BPI_M4ZERO, M4ZERO_I2C_DEV, M4ZERO_SPI_DEV, {M4ZERO_PWM_OFFSET,M4ZERO_I2C_OFFSET,M4ZERO_SPI_OFFSET} },
   { "bananapim4zero", 11301, BPI_MODEL_M4ZERO, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M4ZERO, physToGpio_BPI_M4ZERO, pinTobcm_BPI_M4ZERO, M4ZERO_I2C_DEV, M4ZERO_SPI_DEV, {M4ZERO_PWM_OFFSET,M4ZERO_I2C_OFFSET,M4ZERO_SPI_OFFSET} },
+  { "bpi-m2s",     11401, BPI_MODEL_M2S, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M2S, physToGpio_BPI_M2S, pinTobcm_BPI_M2S, M2S_I2C_DEV, M2S_SPI_DEV, {M2S_PWM_OFFSET,M2S_I2C_OFFSET,M2S_SPI_OFFSET} },
+  { "bananapim2s", 11401, BPI_MODEL_M2S, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M2S, physToGpio_BPI_M2S, pinTobcm_BPI_M2S, M2S_I2C_DEV, M2S_SPI_DEV, {M2S_PWM_OFFSET,M2S_I2C_OFFSET,M2S_SPI_OFFSET} },
+  { "banana-pi-m2s", 11401, BPI_MODEL_M2S, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M2S, physToGpio_BPI_M2S, pinTobcm_BPI_M2S, M2S_I2C_DEV, M2S_SPI_DEV, {M2S_PWM_OFFSET,M2S_I2C_OFFSET,M2S_SPI_OFFSET} },
+  { "bananapi-m2s", 11401, BPI_MODEL_M2S, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M2S, physToGpio_BPI_M2S, pinTobcm_BPI_M2S, M2S_I2C_DEV, M2S_SPI_DEV, {M2S_PWM_OFFSET,M2S_I2C_OFFSET,M2S_SPI_OFFSET} },
   { "bpi-r2",	   11101, BPI_MODEL_R2, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R2, physToGpio_BPI_R2, pinTobcm_BPI_R2, R2_I2C_DEV, R2_SPI_DEV, {R2_PWM_OFFSET,R2_I2C_OFFSET,R2_SPI_OFFSET} },
   { NULL,		0, 0, 1, 2, 5, 0, NULL, NULL, NULL, NULL, NULL, {-1, -1, -1} },
 } ;
@@ -1637,6 +1962,13 @@ static struct BPIBoards *bpi_find_board_by_model_string(const char *hardware)
       strstr(hardware, "BananaPi M4 Zero") ||
       strstr(hardware, "BPI-M4Zero"))
     return bpi_find_board_by_name("bpi-m4zero");
+
+  if (strstr(hardware, "BananaPi M2S") ||
+      strstr(hardware, "BananaPi BPI-M2S") ||
+      strstr(hardware, "Banana Pi BPI-M2S") ||
+      strstr(hardware, "Banana Pi M2S") ||
+      strstr(hardware, "BPI-M2S"))
+    return bpi_find_board_by_name("bpi-m2s");
 
   return NULL;
 }
@@ -1669,6 +2001,7 @@ int bpi_piGpioLayout (void)
   bpi_found = 0; // -1: not init, 0: init but not found, 1: found
   bpi_found_mtk = 0;
   bpi_found_sun50iw9 = 0;
+  bpi_found_meson = 0;
   if ((bpiFd = fopen("/var/lib/bananapi/board.sh", "r")) != NULL) {
     while(fgets(buffer, sizeof(buffer), bpiFd) != NULL) {
       if (sscanf(buffer, "BOARD=%1023s", hardware) != 1)
@@ -1721,6 +2054,7 @@ void bpi_piBoardId (int *model, int *rev, int *mem, int *maker, int *warranty)
     pinTobcm_BP = board->pinTobcm ;
     bpi_found_mtk = (board->model == BPI_MODEL_R2);
     bpi_found_sun50iw9 = (board->model == BPI_MODEL_M4BERRY || board->model == BPI_MODEL_M4ZERO);
+    bpi_found_meson = (board->model == BPI_MODEL_M2S);
     //printf("BPI: name[%s] bType(%d) model(%d)\n",board->name, bType, board->model);
     *model    = bType ;
     *rev      = bRev ;
@@ -1763,6 +2097,22 @@ int bpi_wiringPiSetup (void)
       mtk_gpio_base = NULL;
       return wiringPiFailure (WPI_ALMOST,"wiringPiSetup: mmap (MTK GPIO) failed: %s\n", strerror (errno)) ;
     }
+    initialiseEpoch () ;
+    return 0 ;
+  }
+
+  if (bpi_found_meson)
+  {
+    meson_gpio = (uint32_t *)mmap(0, BLOCK_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, MESON_GPIO_BASE_BP);
+    meson_gpioao = (uint32_t *)mmap(0, BLOCK_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, MESON_GPIO_AO_BASE_BP);
+    close(fd);
+    if (meson_gpio == MAP_FAILED || meson_gpioao == MAP_FAILED)
+    {
+      meson_gpio = NULL;
+      meson_gpioao = NULL;
+      return wiringPiFailure (WPI_ALMOST,"wiringPiSetup: mmap (MESON GPIO) failed: %s\n", strerror (errno)) ;
+    }
+
     initialiseEpoch () ;
     return 0 ;
   }

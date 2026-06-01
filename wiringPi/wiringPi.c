@@ -391,6 +391,7 @@ const char *piModelNames [PI_MODELS_MAX] =
   [BPI_MODEL_M2M_V11] = "Banana Pi M2 Magic v1.1[R16]",
   [BPI_MODEL_M4BERRY] = "Banana Pi M4 Berry[H618]",
   [BPI_MODEL_M4ZERO]  = "Banana Pi M4 Zero[H618]",
+  [BPI_MODEL_M2S]     = "Banana Pi M2S[Amlogic G12B]",
 #endif
 } ;
 
