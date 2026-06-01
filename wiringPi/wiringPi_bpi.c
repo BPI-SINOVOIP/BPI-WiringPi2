@@ -113,6 +113,7 @@ int *pinTobcm_BP ;
 //sunxi_gpio
 #define SUNXI_GPIO_BASE       (0x01c20800)
 #define SUNXI_GPIO_LM_BASE    (0x01f02c00)
+#define SUN50IW9_GPIO_BASE    (0x0300B000)
 #define MAP_SIZE	          (4096*2)
 #define MAP_MASK	          (MAP_SIZE - 1)
 
@@ -163,6 +164,7 @@ int *pinTobcm_BP ;
 
 static int wiringPinMode = WPI_MODE_UNINITIALISED ;
 static int bpi_found_mtk = 0 ;
+static int bpi_found_sun50iw9 = 0 ;
 static uint8_t *mtk_gpio_base = NULL ;
 
 
@@ -190,6 +192,17 @@ static int edge [64] =
 static int pwmmode=0;
 
 static int bpi_wiringPiSetupRegOffset(int mode);
+
+static uint32_t sunxi_gpio_phyaddr(int bank, uint32_t offset)
+{
+  if (bpi_found_sun50iw9)
+    return SUN50IW9_GPIO_BASE + (bank * 36) + offset;
+
+  if (bank >= 11)
+    return SUNXI_GPIO_LM_BASE + ((bank - 11) * 36) + offset;
+
+  return SUNXI_GPIO_BASE + (bank * 36) + offset;
+}
 
 /**
  *A20 Tools for Banana Pi 
@@ -398,7 +411,7 @@ uint32_t sunxi_gpio_readl(uint32_t addr, int bank)
   uint32_t mmap_seek = ((addr - mmap_base) >> 2);
 
   /* DK, for PL and PM */
-  if(bank >= 11)
+  if(!bpi_found_sun50iw9 && bank >= 11)
       val = *(gpio_lm+ mmap_seek);
   else
       val = *(gpio + mmap_seek);
@@ -411,7 +424,7 @@ void sunxi_gpio_writel(uint32_t val, uint32_t addr, int bank)
   uint32_t mmap_base = (addr & ~MAP_MASK);
   uint32_t mmap_seek = ((addr - mmap_base) >> 2);
 
-  if(bank >= 11)
+  if(!bpi_found_sun50iw9 && bank >= 11)
       *(gpio_lm+ mmap_seek) = val;
   else
       *(gpio + mmap_seek) = val;
@@ -614,11 +627,7 @@ int sunxi_get_pin_mode(int pin)
   uint32_t reval=0;
   uint32_t phyaddr=0;
 
-  /* for M2 PM and PL */
-  if(bank >= 11)
-    phyaddr = SUNXI_GPIO_LM_BASE + ((bank - 11) * 36) + ((index >> 3) << 2);
-  else
-  	phyaddr = SUNXI_GPIO_BASE + (bank * 36) + ((index >> 3) << 2);
+  phyaddr = sunxi_gpio_phyaddr(bank, ((index >> 3) << 2));
 
   if (wiringPiDebug)
     printf("func:%s pin:%d,  bank:%d index:%d phyaddr:0x%x\n",__func__, pin , bank,index,phyaddr);
@@ -655,11 +664,7 @@ void sunxi_set_pin_mode(int pin,int mode)
   uint32_t phyaddr=0;
   int reg_offset;
 
-  /* for M2 PM and PL */
-  if(bank >= 11)
-    phyaddr = SUNXI_GPIO_LM_BASE + ((bank - 11) * 36) + ((index >> 3) << 2);
-  else
-    phyaddr = SUNXI_GPIO_BASE + (bank * 36) + ((index >> 3) << 2);
+  phyaddr = sunxi_gpio_phyaddr(bank, ((index >> 3) << 2));
 
   if (wiringPiDebug)
     printf("func:%s pin:%d, MODE:%d bank:%d index:%d phyaddr:0x%x\n",__func__, pin , mode,bank,index,phyaddr);
@@ -774,11 +779,7 @@ void sunxi_digitalWrite(int pin, int value)
   int index = pin - (bank << 5);
   uint32_t phyaddr=0;
 
-  /* for M2 PM and PL */
-  if(bank >= 11)
-    phyaddr = SUNXI_GPIO_LM_BASE + ((bank - 11) * 36) + 0x10;
-  else
-     phyaddr = SUNXI_GPIO_BASE + (bank * 36) + 0x10;
+  phyaddr = sunxi_gpio_phyaddr(bank, 0x10);
 
   if (wiringPiDebug)
     printf("func:%s pin:%d, value:%d bank:%d index:%d phyaddr:0x%x\n",__func__, pin , value,bank,index,phyaddr);
@@ -825,11 +826,7 @@ int sunxi_digitalRead(int pin)
   int index = pin - (bank << 5);
   uint32_t phyaddr=0;
 
-  /* for M2 PM and PL */
-  if(bank >= 11)
-    phyaddr = SUNXI_GPIO_LM_BASE + ((bank - 11) * 36) + 0x10;
-  else
- 	phyaddr = SUNXI_GPIO_BASE + (bank * 36) + 0x10;
+  phyaddr = sunxi_gpio_phyaddr(bank, 0x10);
 
   if (wiringPiDebug)
     printf("func:%s pin:%d,bank:%d index:%d phyaddr:0x%x\n",__func__, pin,bank,index,phyaddr); 
@@ -862,11 +859,7 @@ void sunxi_pullUpDnControl (int pin, int pud)
   int sub_index = index - 16*sub;
   uint32_t phyaddr=0;
 
-  /* for M2 PM and PL */
-  if(bank >= 11)
-    phyaddr = SUNXI_GPIO_LM_BASE + ((bank -11) * 36) + 0x1c + sub*4;
-  else
- 	phyaddr = SUNXI_GPIO_BASE + (bank * 36) + 0x1c + sub*4;
+  phyaddr = sunxi_gpio_phyaddr(bank, 0x1c + sub*4);
 
   if (wiringPiDebug)
 	printf("func:%s pin:%d,bank:%d index:%d sub:%d phyaddr:0x%x\n",__func__, pin,bank,index,sub,phyaddr); 
@@ -1064,7 +1057,7 @@ int bpi_getAlt (int pin)
 
 void bpi_pwmSetMode (int mode)
 {
-  if (bpi_found_mtk)
+  if (bpi_found_mtk || bpi_found_sun50iw9)
     return;
 
   sunxi_pwm_set_mode(mode);
@@ -1074,7 +1067,7 @@ void bpi_pwmSetMode (int mode)
 
 void bpi_pwmSetRange (unsigned int range)
 {
-  if (bpi_found_mtk)
+  if (bpi_found_mtk || bpi_found_sun50iw9)
     return;
 
   sunxi_pwm_set_period(range);
@@ -1084,7 +1077,7 @@ void bpi_pwmSetRange (unsigned int range)
 
 void bpi_pwmSetClock (int divisor)
 {
-  if (bpi_found_mtk)
+  if (bpi_found_mtk || bpi_found_sun50iw9)
     return;
 
   sunxi_pwm_set_clk(divisor);
@@ -1450,6 +1443,8 @@ void bpi_pwmWrite (int pin, int value)
 
   if (bpi_found_mtk)
     return;
+  if (bpi_found_sun50iw9)
+    return;
 
   if(pwmmode==1)//sycle
   {
@@ -1607,11 +1602,49 @@ struct BPIBoards bpiboard [] =
   { "bpi-m2-zero", 11001, BPI_MODEL_M2Z, 1, 1, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M2P, physToGpio_BPI_M2P, pinTobcm_BPI_M2P, M2P_I2C_DEV, M2P_SPI_DEV, {M2P_PWM_OFFSET,M2P_I2C_OFFSET,M2P_SPI_OFFSET} },
   { "bpi-p2z",	   11001, BPI_MODEL_M2Z, 1, 1, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M2P, physToGpio_BPI_M2P, pinTobcm_BPI_M2P, M2P_I2C_DEV, M2P_SPI_DEV, {M2P_PWM_OFFSET,M2P_I2C_OFFSET,M2P_SPI_OFFSET} },
   { "bpi-p2-zero", 11001, BPI_MODEL_M2Z, 1, 1, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M2P, physToGpio_BPI_M2P, pinTobcm_BPI_M2P, M2P_I2C_DEV, M2P_SPI_DEV, {M2P_PWM_OFFSET,M2P_I2C_OFFSET,M2P_SPI_OFFSET} },
+  { "bpi-m4berry", 11201, BPI_MODEL_M4BERRY, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M4BERRY, physToGpio_BPI_M4BERRY, pinTobcm_BPI_M4BERRY, M4BERRY_I2C_DEV, M4BERRY_SPI_DEV, {M4BERRY_PWM_OFFSET,M4BERRY_I2C_OFFSET,M4BERRY_SPI_OFFSET} },
+  { "bpi-m4-berry", 11201, BPI_MODEL_M4BERRY, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M4BERRY, physToGpio_BPI_M4BERRY, pinTobcm_BPI_M4BERRY, M4BERRY_I2C_DEV, M4BERRY_SPI_DEV, {M4BERRY_PWM_OFFSET,M4BERRY_I2C_OFFSET,M4BERRY_SPI_OFFSET} },
+  { "bananapim4berry", 11201, BPI_MODEL_M4BERRY, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M4BERRY, physToGpio_BPI_M4BERRY, pinTobcm_BPI_M4BERRY, M4BERRY_I2C_DEV, M4BERRY_SPI_DEV, {M4BERRY_PWM_OFFSET,M4BERRY_I2C_OFFSET,M4BERRY_SPI_OFFSET} },
   { "bpi-r2",	   11101, BPI_MODEL_R2, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R2, physToGpio_BPI_R2, pinTobcm_BPI_R2, R2_I2C_DEV, R2_SPI_DEV, {R2_PWM_OFFSET,R2_I2C_OFFSET,R2_SPI_OFFSET} },
   { NULL,		0, 0, 1, 2, 5, 0, NULL, NULL, NULL, NULL, NULL, {-1, -1, -1} },
 } ;
 
 extern int bpi_found;
+
+static struct BPIBoards *bpi_find_board_by_name(const char *hardware)
+{
+  struct BPIBoards *board;
+
+  for (board = bpiboard ; board->name != NULL ; ++board)
+    if (strcmp(board->name, hardware) == 0)
+      return board;
+
+  return NULL;
+}
+
+static struct BPIBoards *bpi_find_board_by_model_string(const char *hardware)
+{
+  if (strstr(hardware, "BananaPi M4 Berry") ||
+      strstr(hardware, "Banana Pi BPI-M4 Berry") ||
+      strstr(hardware, "BPI-M4Berry"))
+    return bpi_find_board_by_name("bpi-m4berry");
+
+  return NULL;
+}
+
+static int bpi_set_layout_from_board(struct BPIBoards *board, int *gpioLayout)
+{
+  if (board == NULL)
+    return 0;
+
+  *gpioLayout = board->model;
+  if (*gpioLayout >= BPI_MODEL_MIN) {
+    bpi_found = 1;
+    return 1;
+  }
+
+  return 0;
+}
 
 int bpi_piGpioLayout (void)
 {
@@ -1626,31 +1659,27 @@ int bpi_piGpioLayout (void)
 
   bpi_found = 0; // -1: not init, 0: init but not found, 1: found
   bpi_found_mtk = 0;
-  if ((bpiFd = fopen("/var/lib/bananapi/board.sh", "r")) == NULL) {
-    return -1;
-  }
-  while(!feof(bpiFd)) {
-    fgets(buffer, sizeof(buffer), bpiFd);
-    sscanf(buffer, "BOARD=%s", hardware);
-    //printf("BPI: buffer[%s] hardware[%s]\n",buffer, hardware);
-// Search for board:
-    for (board = bpiboard ; board->name != NULL ; ++board) {
-      //printf("BPI: name[%s] hardware[%s]\n",board->name, hardware);
-      if (strcmp (board->name, hardware) == 0) {
-        //gpioLayout = board->gpioLayout;
-        gpioLayout = board->model; // BPI: use model to replace gpioLayout
-        //printf("BPI: name[%s] gpioLayout(%d)\n",board->name, gpioLayout);
-        if(gpioLayout >= BPI_MODEL_MIN) {
-          bpi_found = 1;
-          break;
-        }
-      }
+  bpi_found_sun50iw9 = 0;
+  if ((bpiFd = fopen("/var/lib/bananapi/board.sh", "r")) != NULL) {
+    while(fgets(buffer, sizeof(buffer), bpiFd) != NULL) {
+      if (sscanf(buffer, "BOARD=%1023s", hardware) != 1)
+        continue;
+
+      board = bpi_find_board_by_name(hardware);
+      if (bpi_set_layout_from_board(board, &gpioLayout))
+        break;
     }
-    if(bpi_found == 1) {
-      break;
-    }
+    fclose(bpiFd);
   }
-  fclose(bpiFd);
+
+  if (bpi_found != 1 && (bpiFd = fopen("/proc/device-tree/model", "r")) != NULL) {
+    if (fgets(hardware, sizeof(hardware), bpiFd) != NULL) {
+      board = bpi_find_board_by_model_string(hardware);
+      bpi_set_layout_from_board(board, &gpioLayout);
+    }
+    fclose(bpiFd);
+  }
+
   //printf("BPI: name[%s] gpioLayout(%d)\n",board->name, gpioLayout);
   return gpioLayout ;
 }
@@ -1682,6 +1711,7 @@ void bpi_piBoardId (int *model, int *rev, int *mem, int *maker, int *warranty)
     physToGpio_BP = board->physToGpio ;
     pinTobcm_BP = board->pinTobcm ;
     bpi_found_mtk = (board->model == BPI_MODEL_R2);
+    bpi_found_sun50iw9 = (board->model == BPI_MODEL_M4BERRY);
     //printf("BPI: name[%s] bType(%d) model(%d)\n",board->name, bType, board->model);
     *model    = bType ;
     *rev      = bRev ;
@@ -1724,6 +1754,18 @@ int bpi_wiringPiSetup (void)
       mtk_gpio_base = NULL;
       return wiringPiFailure (WPI_ALMOST,"wiringPiSetup: mmap (MTK GPIO) failed: %s\n", strerror (errno)) ;
     }
+    initialiseEpoch () ;
+    return 0 ;
+  }
+
+  if (bpi_found_sun50iw9)
+  {
+    gpio_lm = NULL;
+    gpio = (uint32_t *)mmap(0, BLOCK_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, SUN50IW9_GPIO_BASE);
+    close(fd);
+    if ((int32_t)gpio == -1)
+      return wiringPiFailure (WPI_ALMOST,"wiringPiSetup: mmap (SUN50IW9 GPIO) failed: %s\n", strerror (errno)) ;
+
     initialiseEpoch () ;
     return 0 ;
   }
