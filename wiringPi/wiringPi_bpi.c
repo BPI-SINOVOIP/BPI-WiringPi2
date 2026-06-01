@@ -199,6 +199,35 @@ int *pinTobcm_BP ;
 #define SPACEMIT_PULL_OFFSET           13
 #define SPACEMIT_PULL_MASK             (7 << 13)
 
+// Renesas RZ/V2N GPIO
+#define RENESAS_GPIO_BASE_BP           (0x10410000)
+#define RENESAS_GPIO_PIN_BASE          416
+#define RENESAS_GPIO_PIN_END           511
+#define RENESAS_GPIO_MAP_SIZE          (8 * 1024)
+
+#define RENESAS_PINS_PER_PORT          8
+#define RENESAS_EXTENDED_REG_OFFSET    0x10
+#define RENESAS_PIN_OFFSET(pin)        ((pin) - RENESAS_GPIO_PIN_BASE)
+#define RENESAS_PIN_ID_TO_PORT(n)      ((n) / RENESAS_PINS_PER_PORT)
+#define RENESAS_PIN_ID_TO_PORT_OFFSET(n) \
+  (RENESAS_PIN_ID_TO_PORT(n) + RENESAS_EXTENDED_REG_OFFSET)
+#define RENESAS_PIN_ID_TO_PIN(n)       ((n) % RENESAS_PINS_PER_PORT)
+
+#define RENESAS_P(n)                   (0x0000 + 0x10 + (n))
+#define RENESAS_PM(n)                  (0x0100 + 0x20 + (n) * 2)
+#define RENESAS_PMC(n)                 (0x0200 + 0x10 + (n))
+#define RENESAS_PFC(n)                 (0x0400 + 0x40 + (n) * 4)
+#define RENESAS_PIN(n)                 (0x0800 + 0x10 + (n))
+#define RENESAS_PUPD(n)                (0x1C00 + (n) * 8)
+
+#define RENESAS_PM_INPUT               0x1
+#define RENESAS_PM_OUTPUT              0x2
+#define RENESAS_PM_HIZ                 0x12
+
+#define RENESAS_PULL_DIS               0x0
+#define RENESAS_PULL_UP                0x3
+#define RENESAS_PULL_DOWN              0x2
+
 //sunxi_pwm, only use ch0
 #define SUNXI_PWM_BASE        (0x01c21400)
 #define SUNXI_PWM_CH0_CTRL    (SUNXI_PWM_BASE)
@@ -237,11 +266,13 @@ static int bpi_found_mtk = 0 ;
 static int bpi_found_sun50iw9 = 0 ;
 static int bpi_found_meson = 0 ;
 static int bpi_found_spacemit = 0 ;
+static int bpi_found_renesas = 0 ;
 static uint8_t *mtk_gpio_base = NULL ;
 static volatile uint32_t *meson_gpio = NULL ;
 static volatile uint32_t *meson_gpioao = NULL ;
 static volatile uint32_t *spacemit_gpio = NULL ;
 static volatile uint32_t *spacemit_pinctrl = NULL ;
+static volatile uint32_t *renesas_gpio = NULL ;
 
 
 static int syspin [64] =
@@ -1482,6 +1513,191 @@ static void spacemit_digitalWrite(int pin, int value)
   spacemit_update_reg(spacemit_gpio, offset, 0, 1u << shift);
 }
 
+static int renesas_gpio_mapped(void)
+{
+  return renesas_gpio != NULL;
+}
+
+static int renesas_is_pin(int pin)
+{
+  return pin >= RENESAS_GPIO_PIN_BASE && pin <= RENESAS_GPIO_PIN_END;
+}
+
+static void renesas_update_reg(int offset, uint32_t clear, uint32_t set)
+{
+  volatile uint32_t *reg;
+  uint32_t regval;
+
+  if (!renesas_gpio_mapped() || offset < 0)
+    return;
+
+  reg = renesas_gpio + (offset >> 2);
+  regval = *reg;
+  regval &= ~clear;
+  regval |= set;
+  *reg = regval;
+}
+
+static void renesas_set_pin_alt(int pin, int mode)
+{
+  int offset, port, bit, pmc_phyaddr, pmc_shift;
+  uint32_t pmc_mask;
+
+  if (!renesas_is_pin(pin))
+    return;
+
+  offset = RENESAS_PIN_OFFSET(pin);
+  port = RENESAS_PIN_ID_TO_PORT_OFFSET(offset);
+  bit = RENESAS_PIN_ID_TO_PIN(offset);
+  pmc_phyaddr = RENESAS_PMC(port);
+  pmc_shift = (pmc_phyaddr % 4) * 8;
+  pmc_mask = (1u << bit) << pmc_shift;
+
+  renesas_update_reg(pmc_phyaddr, pmc_mask, pmc_mask);
+  renesas_update_reg(RENESAS_PFC(port), 0xfu << (bit * 4),
+                     (uint32_t)(mode & 0xf) << (bit * 4));
+}
+
+static void renesas_set_pin_mode(int pin, int mode)
+{
+  int offset, port, bit, pmc_phyaddr, pmc_shift, pm_phyaddr, pm_shift;
+  uint32_t pmc_mask, pm_mask, pm_value;
+
+  if (!renesas_is_pin(pin))
+    return;
+
+  offset = RENESAS_PIN_OFFSET(pin);
+  port = RENESAS_PIN_ID_TO_PORT_OFFSET(offset);
+  bit = RENESAS_PIN_ID_TO_PIN(offset);
+  pmc_phyaddr = RENESAS_PMC(port);
+  pmc_shift = (pmc_phyaddr % 4) * 8;
+  pm_phyaddr = RENESAS_PM(port);
+  pm_shift = (pm_phyaddr % 4) * 8;
+
+  pmc_mask = (1u << bit) << pmc_shift;
+  pm_mask = (0x3u << (bit * 2)) << pm_shift;
+
+  if (mode == INPUT)
+    pm_value = ((uint32_t)RENESAS_PM_INPUT << (bit * 2)) << pm_shift;
+  else if (mode == OUTPUT)
+    pm_value = ((uint32_t)RENESAS_PM_OUTPUT << (bit * 2)) << pm_shift;
+  else
+    return;
+
+  renesas_update_reg(pmc_phyaddr, pmc_mask, 0);
+  renesas_update_reg(pm_phyaddr, pm_mask, pm_value);
+}
+
+static int renesas_get_pin_mode(int pin)
+{
+  int offset, port, bit, pmc_phyaddr, pmc_shift, pm_phyaddr, pm_shift;
+  uint32_t mode, gpiomode;
+
+  if (!renesas_is_pin(pin) || !renesas_gpio_mapped())
+    return 0;
+
+  offset = RENESAS_PIN_OFFSET(pin);
+  port = RENESAS_PIN_ID_TO_PORT_OFFSET(offset);
+  bit = RENESAS_PIN_ID_TO_PIN(offset);
+  pmc_phyaddr = RENESAS_PMC(port);
+  pmc_shift = (pmc_phyaddr % 4) * 8;
+  pm_phyaddr = RENESAS_PM(port);
+  pm_shift = (pm_phyaddr % 4) * 8;
+
+  mode = (*(renesas_gpio + (pmc_phyaddr >> 2)) >> pmc_shift) & (1u << bit);
+  if (!mode)
+  {
+    gpiomode = *(renesas_gpio + (pm_phyaddr >> 2)) >> pm_shift;
+    gpiomode = (gpiomode >> (bit * 2)) & 0x3;
+    if (gpiomode == RENESAS_PM_OUTPUT)
+      return OUTPUT;
+    if (gpiomode == RENESAS_PM_INPUT)
+      return INPUT;
+    return RENESAS_PM_HIZ;
+  }
+
+  mode = *(renesas_gpio + (RENESAS_PFC(port) >> 2));
+  mode = (mode >> (bit * 4)) & 0xf;
+  return (int)mode + 2;
+}
+
+static void renesas_pullUpDnControl(int pin, int pud)
+{
+  int offset, port, port_offset, bit, pupd_phyaddr;
+  uint32_t pull = RENESAS_PULL_DIS;
+
+  if (!renesas_is_pin(pin))
+    return;
+
+  offset = RENESAS_PIN_OFFSET(pin);
+  port = RENESAS_PIN_ID_TO_PORT_OFFSET(offset);
+  port_offset = port + RENESAS_EXTENDED_REG_OFFSET;
+  bit = RENESAS_PIN_ID_TO_PIN(offset);
+  pupd_phyaddr = RENESAS_PUPD(port_offset);
+
+  if (bit >= 4)
+  {
+    bit -= 4;
+    pupd_phyaddr += 4;
+  }
+
+  if (pud == PUD_UP)
+    pull = RENESAS_PULL_UP;
+  else if (pud == PUD_DOWN)
+    pull = RENESAS_PULL_DOWN;
+
+  renesas_update_reg(pupd_phyaddr, 0x3u << (bit * 8), pull << (bit * 8));
+}
+
+static int renesas_digitalRead(int pin)
+{
+  int offset, port, bit, p_phyaddr, p_shift, pm_phyaddr, pm_shift;
+  int pin_phyaddr, pin_shift;
+  uint32_t gpiomode;
+
+  if (!renesas_is_pin(pin) || !renesas_gpio_mapped())
+    return LOW;
+
+  offset = RENESAS_PIN_OFFSET(pin);
+  port = RENESAS_PIN_ID_TO_PORT_OFFSET(offset);
+  bit = RENESAS_PIN_ID_TO_PIN(offset);
+
+  p_phyaddr = RENESAS_P(port);
+  p_shift = (p_phyaddr % 4) * 8;
+  pm_phyaddr = RENESAS_PM(port);
+  pm_shift = (pm_phyaddr % 4) * 8;
+  pin_phyaddr = RENESAS_PIN(port);
+  pin_shift = (pin_phyaddr % 4) * 8;
+
+  gpiomode = *(renesas_gpio + (pm_phyaddr >> 2)) >> pm_shift;
+  gpiomode = (gpiomode >> (bit * 2)) & 0x3;
+
+  if (gpiomode == RENESAS_PM_INPUT)
+    return ((*(renesas_gpio + (pin_phyaddr >> 2)) >> pin_shift) & (1u << bit)) ? HIGH : LOW;
+  if (gpiomode == RENESAS_PM_OUTPUT)
+    return ((*(renesas_gpio + (p_phyaddr >> 2)) >> p_shift) & (1u << bit)) ? HIGH : LOW;
+
+  return LOW;
+}
+
+static void renesas_digitalWrite(int pin, int value)
+{
+  int offset, port, bit, p_phyaddr, p_shift;
+  uint32_t bit_mask;
+
+  if (!renesas_is_pin(pin))
+    return;
+
+  offset = RENESAS_PIN_OFFSET(pin);
+  port = RENESAS_PIN_ID_TO_PORT_OFFSET(offset);
+  bit = RENESAS_PIN_ID_TO_PIN(offset);
+  p_phyaddr = RENESAS_P(port);
+  p_shift = (p_phyaddr % 4) * 8;
+  bit_mask = (1u << bit) << p_shift;
+
+  renesas_update_reg(p_phyaddr, bit_mask, value == LOW ? 0 : bit_mask);
+}
+
 #ifdef BPI
 
 int bpi_getAlt (int pin)
@@ -1509,6 +1725,8 @@ int bpi_getAlt (int pin)
     return meson_get_pin_mode(pin);
   if (bpi_found_spacemit)
     return spacemit_get_pin_mode(pin);
+  if (bpi_found_renesas)
+    return renesas_get_pin_mode(pin);
 
   alt=sunxi_get_pin_mode(pin);
   return alt ;
@@ -1517,7 +1735,7 @@ int bpi_getAlt (int pin)
 
 void bpi_pwmSetMode (int mode)
 {
-  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit)
+  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas)
     return;
 
   sunxi_pwm_set_mode(mode);
@@ -1527,7 +1745,7 @@ void bpi_pwmSetMode (int mode)
 
 void bpi_pwmSetRange (unsigned int range)
 {
-  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit)
+  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas)
     return;
 
   sunxi_pwm_set_period(range);
@@ -1537,7 +1755,7 @@ void bpi_pwmSetRange (unsigned int range)
 
 void bpi_pwmSetClock (int divisor)
 {
-  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit)
+  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas)
     return;
 
   sunxi_pwm_set_clk(divisor);
@@ -1620,6 +1838,11 @@ void bpi_pinModeAlt (int pin, int mode)
     if (bpi_found_spacemit)
     {
       spacemit_set_pin_alt(pin, mode);
+      return;
+    }
+    if (bpi_found_renesas)
+    {
+      renesas_set_pin_alt(pin, mode);
       return;
     }
     sunxi_set_pin_alt(pin,mode);
@@ -1722,6 +1945,32 @@ void bpi_pinMode (int pin, int mode)
       else if (mode == PULLOFF)
       {
         spacemit_pullUpDnControl(pin, PUD_OFF);
+      }
+      else
+      {
+        return;
+      }
+      wiringPinMode = mode;
+      return;
+    }
+
+    if (bpi_found_renesas)
+    {
+      if (mode == INPUT || mode == OUTPUT)
+      {
+        renesas_set_pin_mode(pin, mode);
+      }
+      else if (mode == PULLUP)
+      {
+        renesas_pullUpDnControl(pin, PUD_UP);
+      }
+      else if (mode == PULLDOWN)
+      {
+        renesas_pullUpDnControl(pin, PUD_DOWN);
+      }
+      else if (mode == PULLOFF)
+      {
+        renesas_pullUpDnControl(pin, PUD_OFF);
       }
       else
       {
@@ -1836,6 +2085,11 @@ void bpi_pullUpDnControl (int pin, int pud)
       spacemit_pullUpDnControl(pin, pud);
       return;
     }
+    if (bpi_found_renesas)
+    {
+      renesas_pullUpDnControl(pin, pud);
+      return;
+    }
     sunxi_pullUpDnControl(pin, pud);
     return;
   }
@@ -1900,6 +2154,8 @@ int bpi_digitalRead (int pin)
       return meson_digitalRead(pin);
     if (bpi_found_spacemit)
       return spacemit_digitalRead(pin);
+    if (bpi_found_renesas)
+      return renesas_digitalRead(pin);
 
     return sunxi_digitalRead(pin);
   }
@@ -1971,6 +2227,11 @@ void bpi_digitalWrite (int pin, int value)
       spacemit_digitalWrite(pin, value);
       return;
     }
+    if (bpi_found_renesas)
+    {
+      renesas_digitalWrite(pin, value);
+      return;
+    }
     sunxi_digitalWrite(pin, value); 
   }
   else
@@ -1987,7 +2248,7 @@ void bpi_pwmWrite (int pin, int value)
 
   uint32_t a_val = 0;
 
-  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit)
+  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas)
     return;
 
   if(pwmmode==1)//sycle
@@ -2177,6 +2438,11 @@ struct BPIBoards bpiboard [] =
   { "bananapif3",  11801, BPI_MODEL_F3, 1, 4, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_F3, physToGpio_BPI_F3, pinTobcm_BPI_F3, F3_I2C_DEV, F3_SPI_DEV, {F3_PWM_OFFSET,F3_I2C_OFFSET,F3_SPI_OFFSET} },
   { "banana-pi-f3", 11801, BPI_MODEL_F3, 1, 4, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_F3, physToGpio_BPI_F3, pinTobcm_BPI_F3, F3_I2C_DEV, F3_SPI_DEV, {F3_PWM_OFFSET,F3_I2C_OFFSET,F3_SPI_OFFSET} },
   { "bananapi-f3", 11801, BPI_MODEL_F3, 1, 4, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_F3, physToGpio_BPI_F3, pinTobcm_BPI_F3, F3_I2C_DEV, F3_SPI_DEV, {F3_PWM_OFFSET,F3_I2C_OFFSET,F3_SPI_OFFSET} },
+  { "bpi-ai2n",    11901, BPI_MODEL_AI2N, 1, 5, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_AI2N, physToGpio_BPI_AI2N, pinTobcm_BPI_AI2N, AI2N_I2C_DEV, AI2N_SPI_DEV, {AI2N_PWM_OFFSET,AI2N_I2C_OFFSET,AI2N_SPI_OFFSET} },
+  { "bpi-ai2-n",   11901, BPI_MODEL_AI2N, 1, 5, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_AI2N, physToGpio_BPI_AI2N, pinTobcm_BPI_AI2N, AI2N_I2C_DEV, AI2N_SPI_DEV, {AI2N_PWM_OFFSET,AI2N_I2C_OFFSET,AI2N_SPI_OFFSET} },
+  { "bananapiai2n", 11901, BPI_MODEL_AI2N, 1, 5, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_AI2N, physToGpio_BPI_AI2N, pinTobcm_BPI_AI2N, AI2N_I2C_DEV, AI2N_SPI_DEV, {AI2N_PWM_OFFSET,AI2N_I2C_OFFSET,AI2N_SPI_OFFSET} },
+  { "banana-pi-ai2n", 11901, BPI_MODEL_AI2N, 1, 5, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_AI2N, physToGpio_BPI_AI2N, pinTobcm_BPI_AI2N, AI2N_I2C_DEV, AI2N_SPI_DEV, {AI2N_PWM_OFFSET,AI2N_I2C_OFFSET,AI2N_SPI_OFFSET} },
+  { "bananapi-ai2n", 11901, BPI_MODEL_AI2N, 1, 5, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_AI2N, physToGpio_BPI_AI2N, pinTobcm_BPI_AI2N, AI2N_I2C_DEV, AI2N_SPI_DEV, {AI2N_PWM_OFFSET,AI2N_I2C_OFFSET,AI2N_SPI_OFFSET} },
   { "bpi-r2",	   11101, BPI_MODEL_R2, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R2, physToGpio_BPI_R2, pinTobcm_BPI_R2, R2_I2C_DEV, R2_SPI_DEV, {R2_PWM_OFFSET,R2_I2C_OFFSET,R2_SPI_OFFSET} },
   { NULL,		0, 0, 1, 2, 5, 0, NULL, NULL, NULL, NULL, NULL, {-1, -1, -1} },
 } ;
@@ -2250,6 +2516,13 @@ static struct BPIBoards *bpi_find_board_by_model_string(const char *hardware)
       strstr(hardware, "k1-x deb1"))
     return bpi_find_board_by_name("bpi-f3");
 
+  if (strstr(hardware, "BananaPi BPI-AI2N") ||
+      strstr(hardware, "Banana Pi BPI-AI2N") ||
+      strstr(hardware, "BananaPi AI2N") ||
+      strstr(hardware, "Banana Pi AI2N") ||
+      strstr(hardware, "BPI-AI2N"))
+    return bpi_find_board_by_name("bpi-ai2n");
+
   return NULL;
 }
 
@@ -2283,6 +2556,7 @@ int bpi_piGpioLayout (void)
   bpi_found_sun50iw9 = 0;
   bpi_found_meson = 0;
   bpi_found_spacemit = 0;
+  bpi_found_renesas = 0;
   if ((bpiFd = fopen("/var/lib/bananapi/board.sh", "r")) != NULL) {
     while(fgets(buffer, sizeof(buffer), bpiFd) != NULL) {
       if (sscanf(buffer, "BOARD=%1023s", hardware) != 1)
@@ -2340,6 +2614,7 @@ void bpi_piBoardId (int *model, int *rev, int *mem, int *maker, int *warranty)
                        board->model == BPI_MODEL_M5 ||
                        board->model == BPI_MODEL_M2PRO);
     bpi_found_spacemit = (board->model == BPI_MODEL_F3);
+    bpi_found_renesas = (board->model == BPI_MODEL_AI2N);
     //printf("BPI: name[%s] bType(%d) model(%d)\n",board->name, bType, board->model);
     *model    = bType ;
     *rev      = bRev ;
@@ -2412,6 +2687,20 @@ int bpi_wiringPiSetup (void)
       spacemit_gpio = NULL;
       spacemit_pinctrl = NULL;
       return wiringPiFailure (WPI_ALMOST,"wiringPiSetup: mmap (SPACEMIT GPIO) failed: %s\n", strerror (errno)) ;
+    }
+
+    initialiseEpoch () ;
+    return 0 ;
+  }
+
+  if (bpi_found_renesas)
+  {
+    renesas_gpio = (uint32_t *)mmap(0, RENESAS_GPIO_MAP_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, RENESAS_GPIO_BASE_BP);
+    close(fd);
+    if (renesas_gpio == MAP_FAILED)
+    {
+      renesas_gpio = NULL;
+      return wiringPiFailure (WPI_ALMOST,"wiringPiSetup: mmap (RENESAS GPIO) failed: %s\n", strerror (errno)) ;
     }
 
     initialiseEpoch () ;
