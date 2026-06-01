@@ -154,12 +154,11 @@ The supported IO surface is:
 
 ## Current Next Item
 
-Continue Batch E router/service-header review from `BPI-R3 / R3 Mini`, then mirror completed boards into `RPi.GPIO`.
+Continue Batch E router/service-header review from `BPI-R64`.
 
 Resume sequence:
 
-1. Mirror the BPI-R4 MT7988 backend and 26-pin map in `RPi.GPIO`.
-2. Add one board or exact carrier alias set at a time in both repos,
+1. Add one board or exact carrier alias set at a time in both repos,
    build-test, commit, and push each repo.
-3. If a carrier map is not reliable from available sources,
+2. If a carrier map is not reliable from available sources,
    mark the row blocked with the exact missing item instead of guessing.
