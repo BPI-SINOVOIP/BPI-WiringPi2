@@ -186,25 +186,6 @@ static int edge [64] =
   -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 } ;
 
-
-
-static int BP_PIN_MASK[14][32] =  //[BANK]  [INDEX]
-{
-  { 0, 1, 2, 3,-1,-1, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,},//PA
-  {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,},//PB
-  { 0, 1, 2, 3, 4,-1,-1, 7,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,},//PC
-  {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,},//PD
-  {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,},//PE
-  {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,},//PF
-  {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,},//PG
-  {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,},//PH
-  {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,},//PI
-  {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,},//PJ
-  {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,},//PK
-  {-1,-1, 2,-1, 4,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,},//PL
-  {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,},//PM
-  {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,},//PN
-};
 //static int version=0;
 static int pwmmode=0;
 
@@ -417,7 +398,7 @@ uint32_t sunxi_gpio_readl(uint32_t addr, int bank)
   uint32_t mmap_seek = ((addr - mmap_base) >> 2);
 
   /* DK, for PL and PM */
-  if(bank == 11)
+  if(bank >= 11)
       val = *(gpio_lm+ mmap_seek);
   else
       val = *(gpio + mmap_seek);
@@ -430,7 +411,7 @@ void sunxi_gpio_writel(uint32_t val, uint32_t addr, int bank)
   uint32_t mmap_base = (addr & ~MAP_MASK);
   uint32_t mmap_seek = ((addr - mmap_base) >> 2);
 
-  if(bank == 11)
+  if(bank >= 11)
       *(gpio_lm+ mmap_seek) = val;
   else
       *(gpio + mmap_seek) = val;
@@ -634,7 +615,7 @@ int sunxi_get_pin_mode(int pin)
   uint32_t phyaddr=0;
 
   /* for M2 PM and PL */
-  if(bank == 11)
+  if(bank >= 11)
     phyaddr = SUNXI_GPIO_LM_BASE + ((bank - 11) * 36) + ((index >> 3) << 2);
   else
   	phyaddr = SUNXI_GPIO_BASE + (bank * 36) + ((index >> 3) << 2);
@@ -675,7 +656,7 @@ void sunxi_set_pin_mode(int pin,int mode)
   int reg_offset;
 
   /* for M2 PM and PL */
-  if(bank == 11)
+  if(bank >= 11)
     phyaddr = SUNXI_GPIO_LM_BASE + ((bank - 11) * 36) + ((index >> 3) << 2);
   else
     phyaddr = SUNXI_GPIO_BASE + (bank * 36) + ((index >> 3) << 2);
@@ -794,7 +775,7 @@ void sunxi_digitalWrite(int pin, int value)
   uint32_t phyaddr=0;
 
   /* for M2 PM and PL */
-  if(bank == 11)
+  if(bank >= 11)
     phyaddr = SUNXI_GPIO_LM_BASE + ((bank - 11) * 36) + 0x10;
   else
      phyaddr = SUNXI_GPIO_BASE + (bank * 36) + 0x10;
@@ -845,7 +826,7 @@ int sunxi_digitalRead(int pin)
   uint32_t phyaddr=0;
 
   /* for M2 PM and PL */
-  if(bank == 11)
+  if(bank >= 11)
     phyaddr = SUNXI_GPIO_LM_BASE + ((bank - 11) * 36) + 0x10;
   else
  	phyaddr = SUNXI_GPIO_BASE + (bank * 36) + 0x10;
@@ -882,7 +863,7 @@ void sunxi_pullUpDnControl (int pin, int pud)
   uint32_t phyaddr=0;
 
   /* for M2 PM and PL */
-  if(bank == 11)
+  if(bank >= 11)
     phyaddr = SUNXI_GPIO_LM_BASE + ((bank -11) * 36) + 0x1c + sub*4;
   else
  	phyaddr = SUNXI_GPIO_BASE + (bank * 36) + 0x1c + sub*4;
@@ -890,7 +871,7 @@ void sunxi_pullUpDnControl (int pin, int pud)
   if (wiringPiDebug)
 	printf("func:%s pin:%d,bank:%d index:%d sub:%d phyaddr:0x%x\n",__func__, pin,bank,index,sub,phyaddr); 
   
-  if(BP_PIN_MASK[bank][index] != -1)
+  if(1)
   {  //PI13~PI21 need check again
     regval = sunxi_gpio_readl(phyaddr, bank);
 	
@@ -1129,7 +1110,7 @@ void sunxi_set_pin_alt(int pin, int mode)
   uint32_t phyaddr=0;
                          
   /* for M2 PM and PL */
-  if(bank == 11)
+  if(bank >= 11)
     phyaddr = SUNXI_GPIO_LM_BASE + ((bank - 11) * 36) + ((index >> 3) << 2);
   else
     phyaddr = SUNXI_GPIO_BASE + (bank * 36) + ((index >> 3) << 2);
