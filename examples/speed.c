@@ -3,10 +3,10 @@
  *	Simple program to measure the speed of the various GPIO
  *	access mechanisms.
  *
- * Copyright (c) 2012-2013 Gordon Henderson. <projects@drogon.net>
+ * Copyright (c) 2012-2013 Gordon Henderson.
  ***********************************************************************
  * This file is part of wiringPi:
- *	https://projects.drogon.net/raspberry-pi/wiringpi/
+ *      https://github.com/WiringPi/WiringPi
  *
  *    wiringPi is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU Lesser General Public License as published by
@@ -84,12 +84,19 @@ int main (void)
   pinMode (11, OUTPUT) ;
   speedTest (11, FAST_COUNT) ;
 
-// Switch to SYS mode:
+// Switch to SYS mode: -> character device ABI
 
-  system ("/usr/local/bin/gpio export 17 out") ;
   printf ("\n/sys/class/gpio method: (%8d iterations)\n", SLOW_COUNT) ;
   wiringPiSetupSys () ;
   speedTest (17, SLOW_COUNT) ;
+
+// character device ABI
+
+  printf ("\ncharacter device ABI method: (%8d iterations)\n", SLOW_COUNT) ;
+  wiringPiSetupGpioDevice (WPI_PIN_BCM) ;
+  pinMode (17, OUTPUT) ;
+  speedTest (17, SLOW_COUNT) ;
+
 
   return 0 ;
 }

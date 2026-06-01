@@ -32,7 +32,24 @@
 #define PULLDOWN        6
 #define PULLOFF         7
 
-#define BPI_MODEL_MIN   21
+#define BPI_MODEL_MIN        64
+#define BPI_MODEL_M1         64
+#define BPI_MODEL_M1P        65
+#define BPI_MODEL_R1         66
+#define BPI_MODEL_M2         67
+#define BPI_MODEL_M3         68
+#define BPI_MODEL_M2P        69
+#define BPI_MODEL_M64        70
+#define BPI_MODEL_M2U        71
+#define BPI_MODEL_M2M        72
+#define BPI_MODEL_M2P_H2P    73
+#define BPI_MODEL_M2P_H5     74
+#define BPI_MODEL_M2U_V40    75
+#define BPI_MODEL_M2Z        76
+#define BPI_MODEL_R2         77
+#define BPI_MODELS_MAX       80
+
+#define BPI_MAKER_SINOVOIP    6
 
 // Function prototypes
 //	c++ wrappers thanks to a comment by Nick Lott

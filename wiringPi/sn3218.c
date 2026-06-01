@@ -4,7 +4,7 @@
  *	Copyright (c) 2012-2013 Gordon Henderson
  ***********************************************************************
  * This file is part of wiringPi:
- *	https://projects.drogon.net/raspberry-pi/wiringpi/
+ *	https://github.com/WiringPi/WiringPi/
  *
  *    wiringPi is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU Lesser General Public License as
@@ -21,6 +21,8 @@
  *    If not, see <http://www.gnu.org/licenses/>.
  ***********************************************************************
  */
+
+#include <stdbool.h>
 
 #include <wiringPi.h>
 #include <wiringPiI2C.h>
@@ -55,7 +57,7 @@ int sn3218Setup (const int pinBase)
   struct wiringPiNodeStruct *node ;
 
   if ((fd = wiringPiI2CSetup (0x54)) < 0)
-    return FALSE ;
+    return false ;
 
 // Setup the chip - initialise all 18 LEDs to off
 
@@ -71,5 +73,5 @@ int sn3218Setup (const int pinBase)
   node->fd          = fd ;
   node->analogWrite = myAnalogWrite ;
 
-  return TRUE ;
+  return true ;
 }

@@ -5,7 +5,7 @@
  *	Copyright (c) 2012 Gordon Henderson
  ***********************************************************************
  * This file is part of wiringPi:
- *	https://projects.drogon.net/raspberry-pi/wiringpi/
+ *	https://github.com/WiringPi/WiringPi/
  *
  *    wiringPi is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU Lesser General Public License as
@@ -165,7 +165,7 @@ void softServoWrite (int servoPin, int value)
 
   servoPin &= 63 ;
 
-  /**/ if (value < -250)
+  if      (value < -250)
     value = -250 ;
   else if (value > 1250)
     value = 1250 ;

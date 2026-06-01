@@ -1,10 +1,10 @@
 /*
  * wiringPiI2C.c:
  *	Simplified I2C access routines
- *	Copyright (c) 2013 Gordon Henderson
+ *	Copyright (c) 2013–2019 Gordon Henderson; 2019–2026 Contributors
  ***********************************************************************
  * This file is part of wiringPi:
- *	https://projects.drogon.net/raspberry-pi/wiringpi/
+ *	https://github.com/WiringPi/WiringPi/
  *
  *    wiringPi is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU Lesser General Public License as
@@ -47,7 +47,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
+#include <unistd.h>
 #include <errno.h>
 #include <string.h>
 #include <fcntl.h>
@@ -154,6 +154,26 @@ int wiringPiI2CReadReg16 (int fd, int reg)
     return data.word & 0xFFFF ;
 }
 
+int wiringPiI2CReadBlockData (int fd, int reg, uint8_t *values, uint8_t size)
+{
+  union i2c_smbus_data data;
+
+  if (size>I2C_SMBUS_BLOCK_MAX) {
+    size = I2C_SMBUS_BLOCK_MAX;
+  }
+  data.block[0] = size;
+  int result = i2c_smbus_access (fd, I2C_SMBUS_READ, reg, I2C_SMBUS_I2C_BLOCK_DATA, &data);
+  if (result<0) {
+    return result;
+  }
+  memcpy(values, &data.block[1], size);
+  return data.block[0];
+}
+
+int wiringPiI2CRawRead (int fd, uint8_t *values, uint8_t size)
+{
+  return(read(fd, values, size));
+}
 
 /*
  * wiringPiI2CWrite:
@@ -189,6 +209,22 @@ int wiringPiI2CWriteReg16 (int fd, int reg, int value)
   return i2c_smbus_access (fd, I2C_SMBUS_WRITE, reg, I2C_SMBUS_WORD_DATA, &data) ;
 }
 
+int wiringPiI2CWriteBlockData (int fd, int reg, const uint8_t *values, uint8_t size)
+{
+    union i2c_smbus_data data;
+
+    if (size>I2C_SMBUS_BLOCK_MAX) {
+      size = I2C_SMBUS_BLOCK_MAX;
+    }
+    data.block[0] = size;
+    memcpy(&data.block[1], values, size);
+    return i2c_smbus_access (fd, I2C_SMBUS_WRITE, reg, I2C_SMBUS_BLOCK_DATA, &data) ;
+}
+
+int wiringPiI2CRawWrite (int fd, const uint8_t *values, uint8_t size)
+{
+  return(write(fd, values, size));
+}
 
 /*
  * wiringPiI2CSetupInterface:
@@ -225,14 +261,20 @@ int wiringPiI2CSetup (const int devId)
   rev = piGpioLayout () ;
 
 #ifdef BPI
-  if(bpi_wiringPiSetupI2C(rev, &device) < 0)
-  	return wiringPiFailure (WPI_ALMOST, "BPI, NO I2C device defined %s\n", strerror (errno)) ;
+  if ((rev >= BPI_MODEL_MIN) && (bpi_wiringPiSetupI2C(rev, &device) == 0))
+    return wiringPiI2CSetupInterface (device, devId) ;
 #else
   if (rev == 1)
     device = "/dev/i2c-0" ;
   else
     device = "/dev/i2c-1" ;
+  return wiringPiI2CSetupInterface (device, devId) ;
 #endif
+
+  if (rev == GPIO_LAYOUT_PI1_REV1)
+    device = "/dev/i2c-0" ;
+  else
+    device = "/dev/i2c-1" ;
 
   return wiringPiI2CSetupInterface (device, devId) ;
 }

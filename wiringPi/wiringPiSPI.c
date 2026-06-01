@@ -1,10 +1,10 @@
 /*
  * wiringPiSPI.c:
  *	Simplified SPI access routines
- *	Copyright (c) 2012-2015 Gordon Henderson
+ *	Copyright (c) 2012–2019 Gordon Henderson; 2019–2026 Contributors
  ***********************************************************************
  * This file is part of wiringPi:
- *	https://projects.drogon.net/raspberry-pi/wiringpi/
+ *	https://github.com/WiringPi/WiringPi/
  *
  *    wiringPi is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU Lesser General Public License as
@@ -23,30 +23,72 @@
  */
 
 
+#include <stdio.h>
+#include <unistd.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <asm/ioctl.h>
 #include <linux/spi/spidev.h>
-
 #include "wiringPi.h"
-
 #include "wiringPiSPI.h"
 
 
 // The SPI bus parameters
 //	Variables as they need to be passed as pointers later on
 
-static const char       *spiDev0  = "/dev/spidev0.0" ;
-static const char       *spiDev1  = "/dev/spidev0.1" ;
+//static const char       *spiDev0  = "/dev/spidev0.0" ;
+//static const char       *spiDev1  = "/dev/spidev0.1" ;
 static const uint8_t     spiBPW   = 8 ;
 static const uint16_t    spiDelay = 0 ;
+//https://datasheets.raspberrypi.com/cm4/cm4-datasheet.pdf   SPI0-6, CS0-2
+//cm5-datasheet.pdf                                          SPI0-5, CS depend on SPInumber, can be up to 4
+//spi0-4cs.dts                                               extention for supporting CS0-4
+const uint8_t     WPI_MaxSPINumbers   = 7 ;
+const uint8_t     WPI_MaxSPIChannels  = 5 ;
 
-static uint32_t    spiSpeeds [2] ;
-static int         spiFds [2] ;
 
+static uint32_t    spiSpeeds [7][3] =
+{
+ {0, 0, 0},
+ {0, 0, 0},
+ {0, 0, 0},
+ {0, 0, 0},
+ {0, 0, 0},
+ {0, 0, 0},
+ {0, 0, 0},
+};
+
+static int         spiFds [7][3] =
+{
+ {-1, -1, -1},
+ {-1, -1, -1},
+ {-1, -1, -1},
+ {-1, -1, -1},
+ {-1, -1, -1},
+ {-1, -1, -1},
+ {-1, -1, -1},
+};
+
+
+int SPICheckLimits(const int number, const int channel) {
+  if (channel<0 || channel>=WPI_MaxSPIChannels) {
+    fprintf (stderr, "wiringPiSPI: Invalid SPI channel (%d, valid range 0-%d)", channel, WPI_MaxSPIChannels-1);
+    return -EINVAL;
+  }
+  if (number<0 || number>=WPI_MaxSPINumbers) {
+    fprintf (stderr, "wiringPiSPI: Invalid SPI number  (%d, valid range 0-%d)", number, WPI_MaxSPINumbers-1);
+    return -EINVAL;
+  }
+
+  return 0;  //sucess
+}
+
+
+#define RETURN_ON_LIMIT_FAIL int ret = SPICheckLimits(number, channel); if(ret!=0) { return ret; };
 
 /*
  * wiringPiSPIGetFd:
@@ -54,9 +96,16 @@ static int         spiFds [2] ;
  *********************************************************************************
  */
 
-int wiringPiSPIGetFd (int channel)
+int wiringPiSPIxGetFd(const int number, int channel)
 {
-  return spiFds [channel & 1] ;
+  if (SPICheckLimits(number, channel)!=0) {
+    return -1;
+  }
+  return spiFds[number][channel];
+}
+
+int wiringPiSPIGetFd(int channel) {
+  return wiringPiSPIxGetFd(0, channel);
 }
 
 
@@ -69,27 +118,33 @@ int wiringPiSPIGetFd (int channel)
  *********************************************************************************
  */
 
-int wiringPiSPIDataRW (int channel, unsigned char *data, int len)
+int wiringPiSPIxDataRW (const int number, const int channel, unsigned char *data, const int len)
 {
+
+  RETURN_ON_LIMIT_FAIL
+  if (-1==spiFds[number][channel]) {
+    fprintf (stderr, "wiringPiSPI: Invalid SPI number/channel (need wiringPiSPIxSetupMode before read/write)");
+    return -EBADF;
+  }
+
   struct spi_ioc_transfer spi ;
-
-  channel &= 1 ;
-
 // Mentioned in spidev.h but not used in the original kernel documentation
 //	test program )-:
-
   memset (&spi, 0, sizeof (spi)) ;
 
   spi.tx_buf        = (unsigned long)data ;
   spi.rx_buf        = (unsigned long)data ;
   spi.len           = len ;
   spi.delay_usecs   = spiDelay ;
-  spi.speed_hz      = spiSpeeds [channel] ;
+  spi.speed_hz      = spiSpeeds [number][channel] ;
   spi.bits_per_word = spiBPW ;
 
-  return ioctl (spiFds [channel], SPI_IOC_MESSAGE(1), &spi) ;
+  return ioctl (spiFds[number][channel], SPI_IOC_MESSAGE(1), &spi) ;
 }
 
+int wiringPiSPIDataRW (int channel, unsigned char *data, int len) {
+  return wiringPiSPIxDataRW(0, channel, data, len);
+}
 
 /*
  * wiringPiSPISetupMode:
@@ -97,42 +152,53 @@ int wiringPiSPIDataRW (int channel, unsigned char *data, int len)
  *********************************************************************************
  */
 
-int wiringPiSPISetupMode (int channel, int speed, int mode)
+
+int wiringPiSPIxSetupMode(const int number, const int channel, const int speed, const int mode)
 {
   int fd ;
+  char spiDev [32] ;
 
-  mode    &= 3 ;	// Mode is 0, 1, 2 or 3
-  channel &= 1 ;	// Channel is 0 or 1
+  RETURN_ON_LIMIT_FAIL
+  if (mode<0 || mode>3) { // Mode is 0, 1, 2 or 3 original
+    fprintf (stderr, "wiringPiSPI: Invalid mode (%d, valid range 0-%d)", mode, 3);
+    return -EINVAL;
+  }
 
 #ifdef BPI
   int rev;
   const char *device;
   
   rev = piGpioLayout();
-  if(bpi_wiringPiSetupSPI(rev, &device) < 0)
-	return wiringPiFailure (WPI_ALMOST, "BPI, NO SPI device defined %s\n", strerror (errno)) ;
-
-  if ((fd = open (device, O_RDWR)) < 0)
+  if ((rev >= BPI_MODEL_MIN) && (bpi_wiringPiSetupSPI(rev, &device) == 0))
+    snprintf (spiDev, 31, "%s", device) ;
+  else
+    snprintf (spiDev, 31, "/dev/spidev%d.%d", number, channel) ;
 #else
-  if ((fd = open (channel == 0 ? spiDev0 : spiDev1, O_RDWR)) < 0)
+  snprintf (spiDev, 31, "/dev/spidev%d.%d", number, channel) ;
 #endif
-    return wiringPiFailure (WPI_ALMOST, "Unable to open SPI device: %s\n", strerror (errno)) ;
-
-  spiSpeeds [channel] = speed ;
-  spiFds    [channel] = fd ;
+  if ((fd = open (spiDev, O_RDWR)) < 0) {
+    return wiringPiFailure (WPI_ALMOST, "Unable to open SPI device %s: %s\n", spiDev, strerror (errno)) ;
+  }
+  spiSpeeds [number][channel] = speed ;
+  spiFds    [number][channel] = fd ;
 
 // Set SPI parameters.
 
   if (ioctl (fd, SPI_IOC_WR_MODE, &mode)            < 0)
-    return wiringPiFailure (WPI_ALMOST, "SPI Mode Change failure: %s\n", strerror (errno)) ;
+    return wiringPiFailure (WPI_ALMOST, "SPI mode change failure: %s\n", strerror (errno)) ;
   
   if (ioctl (fd, SPI_IOC_WR_BITS_PER_WORD, &spiBPW) < 0)
-    return wiringPiFailure (WPI_ALMOST, "SPI BPW Change failure: %s\n", strerror (errno)) ;
+    return wiringPiFailure (WPI_ALMOST, "SPI BPW change failure: %s\n", strerror (errno)) ;
 
   if (ioctl (fd, SPI_IOC_WR_MAX_SPEED_HZ, &speed)   < 0)
-    return wiringPiFailure (WPI_ALMOST, "SPI Speed Change failure: %s\n", strerror (errno)) ;
+    return wiringPiFailure (WPI_ALMOST, "SPI speed change failure: %s\n", strerror (errno)) ;
 
   return fd ;
+}
+
+
+int wiringPiSPISetupMode (int channel, int speed, int mode) {
+ return wiringPiSPIxSetupMode (0, channel, speed, mode);
 }
 
 
@@ -142,7 +208,27 @@ int wiringPiSPISetupMode (int channel, int speed, int mode)
  *********************************************************************************
  */
 
-int wiringPiSPISetup (int channel, int speed)
-{
-  return wiringPiSPISetupMode (channel, speed, 0) ;
+int wiringPiSPIxSetup (const int number, const int channel, const int speed) {
+  return wiringPiSPIxSetupMode(number, channel, speed, 0) ;
+}
+
+
+int wiringPiSPISetup (int channel, int speed) {
+  return wiringPiSPIxSetupMode(0, channel, speed, 0) ;
+}
+
+
+int wiringPiSPIxClose (const int number, const int channel) {
+
+  RETURN_ON_LIMIT_FAIL
+  if (spiFds[number][channel]>0) {
+    ret = close(spiFds[number][channel]);
+  }
+  spiSpeeds [number][channel] = 0 ;
+  spiFds    [number][channel] = -1 ;
+  return ret;
+}
+
+int wiringPiSPIClose (const int channel) {
+  return wiringPiSPIxClose (0, channel);
 }

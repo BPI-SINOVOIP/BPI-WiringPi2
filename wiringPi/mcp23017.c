@@ -4,7 +4,7 @@
  *	Copyright (c) 2013 Gordon Henderson
  ***********************************************************************
  * This file is part of wiringPi:
- *	https://projects.drogon.net/raspberry-pi/wiringpi/
+ *	https://github.com/WiringPi/WiringPi/
  *
  *    wiringPi is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU Lesser General Public License as
@@ -23,6 +23,7 @@
  */
 
 #include <stdio.h>
+#include <stdbool.h>
 #include <pthread.h>
 
 #include "wiringPi.h"
@@ -177,7 +178,7 @@ int mcp23017Setup (const int pinBase, const int i2cAddress)
   struct wiringPiNodeStruct *node ;
 
   if ((fd = wiringPiI2CSetup (i2cAddress)) < 0)
-    return FALSE ;
+    return false ;
 
   wiringPiI2CWriteReg8 (fd, MCP23x17_IOCON, IOCON_INIT) ;
 
@@ -191,5 +192,5 @@ int mcp23017Setup (const int pinBase, const int i2cAddress)
   node->data2           = wiringPiI2CReadReg8 (fd, MCP23x17_OLATA) ;
   node->data3           = wiringPiI2CReadReg8 (fd, MCP23x17_OLATB) ;
 
-  return TRUE ;
+  return true ;
 }

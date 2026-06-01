@@ -5,7 +5,7 @@
 #	Copyright (c) 2012-2015 Gordon Henderson
 #################################################################################
 # This file is part of wiringPi:
-#	https://projects.drogon.net/raspberry-pi/wiringpi/
+#	https://github.com/wiringPi/wiringPi
 #
 #    wiringPi is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU Lesser General Public License as published by
@@ -36,10 +36,11 @@ DYNAMIC=libwiringPi.so.$(VERSION)
 
 #DEBUG	= -g -O0
 DEBUG	= -O2
-CC	= gcc
+CC	?= gcc
 INCLUDE	= -I. -I./board
 DEFS	= -D_GNU_SOURCE
-CFLAGS	= $(DEBUG) $(DEFS) -Wformat=2 -Wall -Wextra -Winline $(INCLUDE) -pipe -fPIC
+CFLAGS	= $(DEBUG) $(DEFS) -Wformat=2 -Wall -Wextra -Winline $(INCLUDE) -pipe -fPIC $(EXTRA_CFLAGS)
+#CFLAGS	= $(DEBUG) $(DEFS) -Wformat=2 -Wall -Wextra -Wconversion -Winline $(INCLUDE) -pipe -fPIC
 
 LIBS    = -lm -lpthread -lrt -lcrypt
 
@@ -61,7 +62,8 @@ SRC	=	wiringPi.c						\
 		bmp180.c htu21d.c ds18b20.c rht03.c			\
 		drcSerial.c drcNet.c					\
 		pseudoPins.c						\
-		wpiExtensions.c
+		wpiExtensions.c						\
+		wiringPiLegacy.c
 
 HEADERS =	$(shell ls *.h)
 
@@ -69,17 +71,13 @@ OBJ	=	$(SRC:.c=.o)
 
 all:		$(DYNAMIC)
 
-static:		$(STATIC)
-
-$(STATIC):	$(OBJ)
-	$Q echo "[Link (Static)]"
-	$Q ar rcs $(STATIC) $(OBJ)
-	$Q ranlib $(STATIC)
-#	@size   $(STATIC)
+.PHONY:	static
+static:	
+		$Q cat noMoreStatic
 
 $(DYNAMIC):	$(OBJ)
 	$Q echo "[Link (Dynamic)]"
-	$Q $(CC) -shared -Wl,-soname,libwiringPi.so$(WIRINGPI_SONAME_SUFFIX) -o libwiringPi.so.$(VERSION) $(LIBS) $(OBJ)
+	$Q $(CC) -shared -Wl,-soname,libwiringPi.so$(WIRINGPI_SONAME_SUFFIX) -o libwiringPi.so.$(VERSION) $(OBJ) $(LIBS)
 
 .c.o:
 	$Q echo [Compile] $<
@@ -108,24 +106,21 @@ install:	$(DYNAMIC)
 	$Q ln -sf $(DESTDIR)$(PREFIX)/lib/libwiringPi.so.$(VERSION)	$(DESTDIR)/lib/libwiringPi.so
 	$Q $(LDCONFIG)
 
-.PHONY:	install-static
-install-static:	$(STATIC)
-	$Q echo "[Install Headers]"
-	$Q install -m 0755 -d						$(DESTDIR)$(PREFIX)/include
-	$Q install -m 0644 $(HEADERS)					$(DESTDIR)$(PREFIX)/include
-	$Q echo "[Install Static Lib]"
-	$Q install -m 0755 -d						$(DESTDIR)$(PREFIX)/lib
-	$Q install -m 0755 libwiringPi.a					$(DESTDIR)$(PREFIX)/lib
+.PHONY: check-deb-destdir
+check-deb-destdir:
+ifndef DEB_DESTDIR
+	$(error DEB_DESTDIR is undefined)
+endif
 
 .PHONY:	install-deb
-install-deb:	$(DYNAMIC)
+install-deb:	$(DYNAMIC) check-deb-destdir
 	$Q echo "[Install Headers: deb]"
-	$Q install -m 0755 -d							~/wiringPi/debian-template/wiringPi/usr/include
-	$Q install -m 0644 $(HEADERS)						~/wiringPi/debian-template/wiringPi/usr/include
+	$Q install -m 0755 -d							$(DEB_DESTDIR)/usr/include
+	$Q install -m 0644 $(HEADERS)						$(DEB_DESTDIR)/usr/include
 	$Q echo "[Install Dynamic Lib: deb]"
-	install -m 0755 -d							~/wiringPi/debian-template/wiringPi/usr/lib
-	install -m 0755 libwiringPi.so.$(VERSION)				~/wiringPi/debian-template/wiringPi/usr/lib/libwiringPi.so.$(VERSION)
-	ln -sf ~/wiringPi/debian-template/wiringPi/usr/lib/libwiringPi.so.$(VERSION)	~/wiringPi/debian-template/wiringPi/usr/lib/libwiringPi.so
+	install -m 0755 -d							$(DEB_DESTDIR)/usr/lib
+	install -m 0755 libwiringPi.so.$(VERSION)				$(DEB_DESTDIR)/usr/lib/libwiringPi.so.$(VERSION)
+	ln -sf $(DEB_DESTDIR)/usr/lib/libwiringPi.so.$(VERSION)	$(DEB_DESTDIR)/usr/lib/libwiringPi.so
 
 .PHONY:	uninstall
 uninstall:

@@ -1371,20 +1371,20 @@ struct BPIBoards bpiboard [] =
   { "bpi-rpi",	      -1, 18, 1, 2, 5, 0, NULL, NULL, NULL, NULL, NULL, {-1, -1, -1} },
   { "bpi-rpi2",	      -1, 19, 1, 2, 5, 0, NULL, NULL, NULL, NULL, NULL, {-1, -1, -1} },
   { "bpi-rpi3",	      -1, 20, 1, 2, 5, 0, NULL, NULL, NULL, NULL, NULL, {-1, -1, -1} },
-  { "bpi-m1",	   10001, 21, 1, 2, 5, 0, pinToGpio_BPI_M1P, physToGpio_BPI_M1P, pinTobcm_BPI_M1P, M1P_I2C_DEV, M1P_SPI_DEV, {M1P_PWM_OFFSET,M1P_I2C_OFFSET,M1P_SPI_OFFSET} },
-  { "bpi-m1p",	   10001, 22, 1, 2, 5, 0, pinToGpio_BPI_M1P, physToGpio_BPI_M1P, pinTobcm_BPI_M1P, M1P_I2C_DEV, M1P_SPI_DEV, {M1P_PWM_OFFSET,M1P_I2C_OFFSET,M1P_SPI_OFFSET} },
-  { "bpi-r1",	   10001, 23, 1, 2, 5, 0, pinToGpio_BPI_M1P, physToGpio_BPI_M1P, pinTobcm_BPI_M1P, M1P_I2C_DEV, M1P_SPI_DEV, {M1P_PWM_OFFSET,M1P_I2C_OFFSET,M1P_SPI_OFFSET} },
-  { "bpi-m2",	   10101, 24, 1, 2, 5, 0, pinToGpio_BPI_M2, physToGpio_BPI_M2, pinTobcm_BPI_M2, M2_I2C_DEV, M2_SPI_DEV, {M2_PWM_OFFSET,M2_I2C_OFFSET,M2_SPI_OFFSET} },
-  { "bpi-m3",	   10201, 25, 1, 3, 5, 0, pinToGpio_BPI_M3, physToGpio_BPI_M3, pinTobcm_BPI_M3, M3_I2C_DEV, M3_SPI_DEV, {M3_PWM_OFFSET,M3_I2C_OFFSET,M3_SPI_OFFSET} },
-  { "bpi-m2p",	   10301, 26, 1, 2, 5, 0, pinToGpio_BPI_M2P, physToGpio_BPI_M2P, pinTobcm_BPI_M2P, M2P_I2C_DEV, M2P_SPI_DEV, {M2P_PWM_OFFSET,M2P_I2C_OFFSET,M2P_SPI_OFFSET} },
-  { "bpi-m64",	   10401, 27, 1, 3, 5, 0, pinToGpio_BPI_M64, physToGpio_BPI_M64, pinTobcm_BPI_M64, M64_I2C_DEV, M64_SPI_DEV, {M64_PWM_OFFSET,M64_I2C_OFFSET,M64_SPI_OFFSET} },
-  { "bpi-m2u",	   10501, 28, 1, 3, 5, 0, pinToGpio_BPI_M2U, physToGpio_BPI_M2U, pinTobcm_BPI_M2U, M2U_I2C_DEV, M2U_SPI_DEV, {M2U_PWM_OFFSET,M2U_I2C_OFFSET,M2U_SPI_OFFSET} },
-  { "bpi-m2m",	   10601, 29, 1, 1, 5, 0, pinToGpio_BPI_M2M, physToGpio_BPI_M2M, pinTobcm_BPI_M2M, M2M_I2C_DEV, M2M_SPI_DEV, {M2M_PWM_OFFSET,M2M_I2C_OFFSET,M2M_SPI_OFFSET} },
-  { "bpi-m2p_H2+", 10701, 30, 1, 2, 5, 0, pinToGpio_BPI_M2P, physToGpio_BPI_M2P, pinTobcm_BPI_M2P, M2P_I2C_DEV, M2P_SPI_DEV, {M2P_PWM_OFFSET,M2P_I2C_OFFSET,M2P_SPI_OFFSET} },
-  { "bpi-m2p_H5",  10801, 31, 1, 2, 5, 0, pinToGpio_BPI_M2P, physToGpio_BPI_M2P, pinTobcm_BPI_M2P, M2P_I2C_DEV, M2P_SPI_DEV, {M2P_PWM_OFFSET,M2P_I2C_OFFSET,M2P_SPI_OFFSET} },
-  { "bpi-m2u_V40", 10901, 32, 1, 3, 5, 0, pinToGpio_BPI_M2U, physToGpio_BPI_M2U, pinTobcm_BPI_M2U, M2U_I2C_DEV, M2U_SPI_DEV, {M2U_PWM_OFFSET,M2U_I2C_OFFSET,M2U_SPI_OFFSET} },
-  { "bpi-m2z",	   11001, 33, 1, 1, 5, 0, pinToGpio_BPI_M2P, physToGpio_BPI_M2P, pinTobcm_BPI_M2P, M2P_I2C_DEV, M2P_SPI_DEV, {M2P_PWM_OFFSET,M2P_I2C_OFFSET,M2P_SPI_OFFSET} },
-  { "bpi-r2",	   11101, 34, 1, 3, 5, 0, pinToGpio_BPI_R2, physToGpio_BPI_R2, pinTobcm_BPI_R2, R2_I2C_DEV, R2_SPI_DEV, {R2_PWM_OFFSET,R2_I2C_OFFSET,R2_SPI_OFFSET} },  // !!!!! mem field is copy from M3, don't know correct num for R2
+  { "bpi-m1",	   10001, BPI_MODEL_M1, 1, 2, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M1P, physToGpio_BPI_M1P, pinTobcm_BPI_M1P, M1P_I2C_DEV, M1P_SPI_DEV, {M1P_PWM_OFFSET,M1P_I2C_OFFSET,M1P_SPI_OFFSET} },
+  { "bpi-m1p",	   10001, BPI_MODEL_M1P, 1, 2, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M1P, physToGpio_BPI_M1P, pinTobcm_BPI_M1P, M1P_I2C_DEV, M1P_SPI_DEV, {M1P_PWM_OFFSET,M1P_I2C_OFFSET,M1P_SPI_OFFSET} },
+  { "bpi-r1",	   10001, BPI_MODEL_R1, 1, 2, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M1P, physToGpio_BPI_M1P, pinTobcm_BPI_M1P, M1P_I2C_DEV, M1P_SPI_DEV, {M1P_PWM_OFFSET,M1P_I2C_OFFSET,M1P_SPI_OFFSET} },
+  { "bpi-m2",	   10101, BPI_MODEL_M2, 1, 2, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M2, physToGpio_BPI_M2, pinTobcm_BPI_M2, M2_I2C_DEV, M2_SPI_DEV, {M2_PWM_OFFSET,M2_I2C_OFFSET,M2_SPI_OFFSET} },
+  { "bpi-m3",	   10201, BPI_MODEL_M3, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M3, physToGpio_BPI_M3, pinTobcm_BPI_M3, M3_I2C_DEV, M3_SPI_DEV, {M3_PWM_OFFSET,M3_I2C_OFFSET,M3_SPI_OFFSET} },
+  { "bpi-m2p",	   10301, BPI_MODEL_M2P, 1, 2, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M2P, physToGpio_BPI_M2P, pinTobcm_BPI_M2P, M2P_I2C_DEV, M2P_SPI_DEV, {M2P_PWM_OFFSET,M2P_I2C_OFFSET,M2P_SPI_OFFSET} },
+  { "bpi-m64",	   10401, BPI_MODEL_M64, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M64, physToGpio_BPI_M64, pinTobcm_BPI_M64, M64_I2C_DEV, M64_SPI_DEV, {M64_PWM_OFFSET,M64_I2C_OFFSET,M64_SPI_OFFSET} },
+  { "bpi-m2u",	   10501, BPI_MODEL_M2U, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M2U, physToGpio_BPI_M2U, pinTobcm_BPI_M2U, M2U_I2C_DEV, M2U_SPI_DEV, {M2U_PWM_OFFSET,M2U_I2C_OFFSET,M2U_SPI_OFFSET} },
+  { "bpi-m2m",	   10601, BPI_MODEL_M2M, 1, 1, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M2M, physToGpio_BPI_M2M, pinTobcm_BPI_M2M, M2M_I2C_DEV, M2M_SPI_DEV, {M2M_PWM_OFFSET,M2M_I2C_OFFSET,M2M_SPI_OFFSET} },
+  { "bpi-m2p_H2+", 10701, BPI_MODEL_M2P_H2P, 1, 2, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M2P, physToGpio_BPI_M2P, pinTobcm_BPI_M2P, M2P_I2C_DEV, M2P_SPI_DEV, {M2P_PWM_OFFSET,M2P_I2C_OFFSET,M2P_SPI_OFFSET} },
+  { "bpi-m2p_H5",  10801, BPI_MODEL_M2P_H5, 1, 2, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M2P, physToGpio_BPI_M2P, pinTobcm_BPI_M2P, M2P_I2C_DEV, M2P_SPI_DEV, {M2P_PWM_OFFSET,M2P_I2C_OFFSET,M2P_SPI_OFFSET} },
+  { "bpi-m2u_V40", 10901, BPI_MODEL_M2U_V40, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M2U, physToGpio_BPI_M2U, pinTobcm_BPI_M2U, M2U_I2C_DEV, M2U_SPI_DEV, {M2U_PWM_OFFSET,M2U_I2C_OFFSET,M2U_SPI_OFFSET} },
+  { "bpi-m2z",	   11001, BPI_MODEL_M2Z, 1, 1, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M2P, physToGpio_BPI_M2P, pinTobcm_BPI_M2P, M2P_I2C_DEV, M2P_SPI_DEV, {M2P_PWM_OFFSET,M2P_I2C_OFFSET,M2P_SPI_OFFSET} },
+  { "bpi-r2",	   11101, BPI_MODEL_R2, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R2, physToGpio_BPI_R2, pinTobcm_BPI_R2, R2_I2C_DEV, R2_SPI_DEV, {R2_PWM_OFFSET,R2_I2C_OFFSET,R2_SPI_OFFSET} },  // !!!!! mem field is copy from M3, don't know correct num for R2
   { NULL,		0, 0, 1, 2, 5, 0, NULL, NULL, NULL, NULL, NULL, {-1, -1, -1} },
 } ;
 
@@ -1416,7 +1416,7 @@ int bpi_piGpioLayout (void)
         //gpioLayout = board->gpioLayout;
         gpioLayout = board->model; // BPI: use model to replace gpioLayout
         //printf("BPI: name[%s] gpioLayout(%d)\n",board->name, gpioLayout);
-        if(gpioLayout >= 21) {
+        if(gpioLayout >= BPI_MODEL_MIN) {
           bpi_found = 1;
           break;
         }
@@ -1439,8 +1439,13 @@ void bpi_piBoardId (int *model, int *rev, int *mem, int *maker, int *warranty)
 
   gpioLayout = piGpioLayout () ;
   //printf("BPI: gpioLayout(%d)\n", gpioLayout);
-  if(gpioLayout>=21) {
-    board = &bpiboard[gpioLayout];
+  if(gpioLayout >= BPI_MODEL_MIN) {
+    for (board = bpiboard ; board->name != NULL ; ++board) {
+      if (board->model == gpioLayout)
+        break;
+    }
+    if (board->name == NULL)
+      return;
     //printf("BPI: name[%s] gpioLayout(%d)\n",board->name, gpioLayout);
     bRev      = board->rev;
     bType     = board->model;

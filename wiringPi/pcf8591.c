@@ -5,7 +5,7 @@
  *	Copyright (c) 2013 Gordon Henderson
  ***********************************************************************
  * This file is part of wiringPi:
- *	https://projects.drogon.net/raspberry-pi/wiringpi/
+ *	https://github.com/WiringPi/WiringPi/
  *
  *    wiringPi is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU Lesser General Public License as
@@ -24,6 +24,8 @@
  */
 
 #include <unistd.h>
+#include <stdbool.h>
+#include <stdio.h>
 
 #include "wiringPi.h"
 #include "wiringPiI2C.h"
@@ -41,7 +43,10 @@ static void myAnalogWrite (struct wiringPiNodeStruct *node, UNU int pin, int val
   unsigned char b [2] ;
   b [0] = 0x40 ;
   b [1] = value & 0xFF ;
-  write (node->fd, b, 2) ;
+  ssize_t bytes_written = write(node->fd, b, 2);
+  if (bytes_written != 2) {
+      perror("Error writing to file descriptor");
+  }
 }
 
 
@@ -78,7 +83,7 @@ int pcf8591Setup (const int pinBase, const int i2cAddress)
   struct wiringPiNodeStruct *node ;
 
   if ((fd = wiringPiI2CSetup (i2cAddress)) < 0)
-    return FALSE ;
+    return false ;
 
   node = wiringPiNewNode (pinBase, 4) ;
 
@@ -86,5 +91,5 @@ int pcf8591Setup (const int pinBase, const int i2cAddress)
   node->analogRead  = myAnalogRead ;
   node->analogWrite = myAnalogWrite ;
 
-  return TRUE ;
+  return true ;
 }

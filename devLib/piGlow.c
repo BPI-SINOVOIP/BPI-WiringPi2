@@ -5,7 +5,7 @@
  * Copyright (c) 2013 Gordon Henderson.
  ***********************************************************************
  * This file is part of wiringPi:
- *	https://projects.drogon.net/raspberry-pi/wiringpi/
+ *	https://github.com/WiringPi/WiringPi/
  *
  *    wiringPi is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU Lesser General Public License as published by
@@ -47,12 +47,9 @@ void piGlow1 (const int leg, const int ring, const int intensity)
   if ((leg  < 0) || (leg  > 2)) return ;
   if ((ring < 0) || (ring > 5)) return ;
 
-  /**/ if (leg == 0)
-    legLeds = leg0 ;
-  else if (leg == 1)
-    legLeds = leg1 ;
-  else
-    legLeds = leg2 ;
+  if      (leg == 0) { legLeds = leg0 ; }
+  else if (leg == 1) { legLeds = leg1 ; }
+  else               { legLeds = leg2 ; }
 
   analogWrite (PIGLOW_BASE + legLeds [ring], intensity) ;
 }
@@ -71,12 +68,9 @@ void piGlowLeg (const int leg, const int intensity)
   if ((leg < 0) || (leg > 2))
     return ;
 
-  /**/ if (leg == 0)
-    legLeds = leg0 ;
-  else if (leg == 1)
-    legLeds = leg1 ;
-  else
-    legLeds = leg2 ;
+  if      (leg == 0) { legLeds = leg0 ; }
+  else if (leg == 1) { legLeds = leg1 ; }
+  else               { legLeds = leg2 ; }
 
   for (i = 0 ; i < 6 ; ++i)
     analogWrite (PIGLOW_BASE + legLeds [i], intensity) ;

@@ -5,7 +5,7 @@
  * Copyright (c) 2013 Gordon Henderson.
  ***********************************************************************
  * This file is part of wiringPi:
- *	https://projects.drogon.net/raspberry-pi/wiringpi/
+ *	https://github.com/WiringPi/WiringPi/
  *
  *    wiringPi is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU Lesser General Public License as published by
@@ -205,7 +205,7 @@ int main (int argc, char *argv [])
 
   if (argc == 2)
   {
-    /**/ if (strcmp (argv [1], "-slc") == 0)
+    if      (strcmp (argv [1], "-slc") == 0)
       return setLinuxClock () ;
     else if (strcmp (argv [1], "-sdsc") == 0)
       return setDSclock () ;

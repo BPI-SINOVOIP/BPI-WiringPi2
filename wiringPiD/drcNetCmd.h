@@ -3,7 +3,7 @@
  *	Copyright (c) 2012-2017 Gordon Henderson
  ***********************************************************************
  * This file is part of wiringPi:
- *	https://projects.drogon.net/raspberry-pi/wiringpi/
+ *	https://github.com/WiringPi/WiringPi/
  *
  *    wiringPi is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU Lesser General Public License as published by
@@ -33,16 +33,6 @@
 #define	DRCN_DIGITAL_READ	7
 #define	DRCN_DIGITAL_READ8	8
 #define	DRCN_ANALOG_READ	9
-
-// Multiple definition for comDat fix
-/*
-struct drcNetComStruct
-{
-  uint32_t pin ;
-  uint32_t cmd ;
-  uint32_t data ;
-} comDat ;
-*/
 
 struct drcNetComStruct
 {

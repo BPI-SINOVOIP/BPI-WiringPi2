@@ -1,10 +1,10 @@
 /*
  * pcf8574.c:
  *	Extend wiringPi with the PCF8574 I2C GPIO expander chip
- *	Copyright (c) 2013 Gordon Henderson
+ *	Copyright (c) 2013-2024 Gordon Henderson and contributors
  ***********************************************************************
  * This file is part of wiringPi:
- *	https://projects.drogon.net/raspberry-pi/wiringpi/
+ *	https://github.com/WiringPi/WiringPi/
  *
  *    wiringPi is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU Lesser General Public License as
@@ -23,6 +23,7 @@
  */
 
 #include <stdio.h>
+#include <stdbool.h>
 #include <pthread.h>
 
 #include "wiringPi.h"
@@ -33,8 +34,9 @@
 
 /*
  * myPinMode:
- *	The PCF8574 is an odd chip - the pins are effectively bi-directional,
- *	however the pins should be drven high when used as an input pin...
+ *	The PCF8574 is a 8-Bit I/O Expander with Open-drain output.
+ *  The pins are effectively bi-directional,
+ *	however the pins should be driven high when used as an input pin...
  *	So, we're effectively copying digitalWrite...
  *********************************************************************************
  */
@@ -102,7 +104,7 @@ static int myDigitalRead (struct wiringPiNodeStruct *node, int pin)
  * pcf8574Setup:
  *	Create a new instance of a PCF8574 I2C GPIO interface. We know it
  *	has 8 pins, so all we need to know here is the I2C address and the
- *	user-defined pin base.
+ *	user-defined pin base. Default address (A0-A3 low) is 0x20.
  *********************************************************************************
  */
 
@@ -112,7 +114,7 @@ int pcf8574Setup (const int pinBase, const int i2cAddress)
   struct wiringPiNodeStruct *node ;
 
   if ((fd = wiringPiI2CSetup (i2cAddress)) < 0)
-    return FALSE ;
+    return false ;
 
   node = wiringPiNewNode (pinBase, 8) ;
 
@@ -122,5 +124,5 @@ int pcf8574Setup (const int pinBase, const int i2cAddress)
   node->digitalWrite = myDigitalWrite ;
   node->data2        = wiringPiI2CRead (fd) ;
 
-  return TRUE ;
+  return true ;
 }

@@ -9,7 +9,7 @@
  *	Copyright (c) 2013 Gordon Henderson
  ***********************************************************************
  * This file is part of wiringPi:
- *	https://projects.drogon.net/raspberry-pi/wiringpi/
+ *	https://github.com/WiringPi/WiringPi/
  *
  *    wiringPi is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU Lesser General Public License as
@@ -29,6 +29,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "wiringPi.h"
 
@@ -105,5 +106,5 @@ int sr595Setup (const int pinBase, const int numPins,
   pinMode (clockPin, OUTPUT) ;
   pinMode (latchPin, OUTPUT) ;
 
-  return TRUE ;
+  return true ;
 }

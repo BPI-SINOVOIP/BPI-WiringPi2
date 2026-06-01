@@ -1,10 +1,10 @@
 /*
  * wiringPiSPI.h:
  *	Simplified SPI access routines
- *	Copyright (c) 2012-2015 Gordon Henderson
+ *	Copyright (c) 2012–2019 Gordon Henderson; 2019–2026 Contributors
  ***********************************************************************
  * This file is part of wiringPi:
- *	https://projects.drogon.net/raspberry-pi/wiringpi/
+ *	https://github.com/WiringPi/WiringPi/
  *
  *    wiringPi is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU Lesser General Public License as
@@ -26,10 +26,20 @@
 extern "C" {
 #endif
 
+
+
 int wiringPiSPIGetFd     (int channel) ;
 int wiringPiSPIDataRW    (int channel, unsigned char *data, int len) ;
 int wiringPiSPISetupMode (int channel, int speed, int mode) ;
 int wiringPiSPISetup     (int channel, int speed) ;
+int wiringPiSPIClose     (const int channel); //Interface 3.5
+
+//Interface 3.5
+int wiringPiSPIxGetFd     (const int number, const int channel) ;
+int wiringPiSPIxDataRW    (const int number, const int channel, unsigned char *data, const int len) ;
+int wiringPiSPIxSetupMode (const int number, const int channel, const int speed, const int mode) ;
+int wiringPiSPIxSetup     (const int number, const int channel, const int speed) ;
+int wiringPiSPIxClose     (const int number, const int channel);
 
 #ifdef __cplusplus
 }

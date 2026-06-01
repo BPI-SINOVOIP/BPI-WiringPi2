@@ -1,7 +1,7 @@
 #
 # Makefile:
 #	wiringPi - A "wiring" library for the Raspberry Pi
-#	https://projects.drogon.net/wiring-pi
+#       https://github.com/wiringPi/wiringPi
 #
 #	Copyright (c) 2012 Gordon Henderson
 #################################################################################
@@ -28,9 +28,9 @@ endif
 
 #DEBUG	= -g -O0
 DEBUG	= -O3
-CC	= gcc
+CC	?= gcc
 INCLUDE	= -I/usr/local/include
-CFLAGS	= $(DEBUG) -Wall $(INCLUDE) -Winline -pipe
+CFLAGS	= $(DEBUG) -Wall $(INCLUDE) -Winline -pipe $(EXTRA_CFLAGS)
 
 LDFLAGS	= -L/usr/local/lib
 LDLIBS    = -lwiringPi -lwiringPiDev -lpthread -lm

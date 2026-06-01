@@ -3,7 +3,7 @@
 # build
 #	Simple wiringPi build and install script
 #
-#	Copyright (c) 2012-2015 Gordon Henderson
+#	Copyright (c) 2012-2024 Gordon Henderson and contributors
 #################################################################################
 # This file is part of wiringPi:
 #	A "wiring" library for the Raspberry Pi
@@ -36,8 +36,8 @@ check_make_ok() {
     echo ""
     echo "Make Failed..."
     echo "Please check the messages and fix any problems. If you're still stuck,"
-    echo "then please email all the output and as many details as you can to"
-    echo "  projects@drogon.net"
+    echo "then raise a GitHub issue with the output and as many details as you can"
+    echo "  https://github.com/WiringPi/WiringPi/issues"
     echo ""
     exit 1
   fi
@@ -64,6 +64,9 @@ if [ x$1 = "xclean" ]; then
   echo -n "PiGlow:     "	; make clean
   cd ../scrollPhat
   echo -n "scrollPhat: "	; make clean
+  cd ../..
+  echo -n "Deb: " ; rm  -f debian-template/wiringpi*.deb
+  echo
   exit
 fi
 
@@ -80,18 +83,25 @@ fi
 # Only if you know what you're doing!
 
 if [ x$1 = "xdebian" ]; then
+  vMaj=`cut -d. -f1 VERSION`
+  vMin=`cut -d. -f2 VERSION`
   here=`pwd`
+  deb_destdir=${here}/debian-template/wiringPi
   cd debian-template/wiringPi
+  export VERSION=$vMaj.$vMin
+  export ARCH=$(dpkg-architecture -qDEB_HOST_ARCH)
+  echo version:$VERSION architecture:$ARCH
+  envsubst < control_template > DEBIAN/control
   rm -rf usr
   cd $here/wiringPi
-  make install-deb
+  make install-deb DEB_DESTDIR=${deb_destdir}
   cd $here/devLib
-  make install-deb INCLUDE='-I. -I../wiringPi'
+  make install-deb INCLUDE='-I. -I../wiringPi' DEB_DESTDIR=${deb_destdir}
   cd $here/gpio
-  make install-deb INCLUDE='-I../wiringPi -I../devLib' LDFLAGS=-L../debian-template/wiringPi/usr/lib
+  make install-deb INCLUDE='-I../wiringPi -I../devLib' LDFLAGS=-L../debian-template/wiringPi/usr/lib DEB_DESTDIR=${deb_destdir}
   cd $here/debian-template
   fakeroot dpkg-deb --build wiringPi
-  mv wiringPi.deb  wiringpi-`cat $here/VERSION`-1.deb
+  dpkg-name -o wiringPi.deb
   exit
 fi
 
@@ -105,22 +115,6 @@ fi
   echo
 
   hardware=`fgrep Hardware /proc/cpuinfo | head -1 | awk '{ print $3 }'`
-
-#  if [ x$hardware != "xBCM2708" ]; then
-#    echo ""
-#    echo "   +------------------------------------------------------------+"
-#    echo "   |   wiringPi is designed to run on the Raspberry Pi only.    |"
-#    echo "   |   This processor does not appear to be a Raspberry Pi.     |"
-#    echo "   +------------------------------------------------------------+"
-#    echo "   | In the unlikely event that you think it is a Raspberry Pi, |"
-#    echo "   | then please accept my apologies and email the contents of  |"
-#    echo "   | /proc/cpuinfo to projects@drogon.net.                      |"
-#    echo "   |    - Thanks, Gordon                                        |"
-#    echo "   +------------------------------------------------------------+"
-#    echo ""
-#    exit 1
-#  fi
-
 
   echo
   echo "WiringPi Library"

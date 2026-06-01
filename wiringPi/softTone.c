@@ -8,7 +8,7 @@
  *	Copyright (c) 2012 Gordon Henderson
  ***********************************************************************
  * This file is part of wiringPi:
- *	https://projects.drogon.net/raspberry-pi/wiringpi/
+ *	https://github.com/WiringPi/WiringPi/
  *
  *    wiringPi is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU Lesser General Public License as
@@ -92,7 +92,7 @@ void softToneWrite (int pin, int freq)
 {
   pin &= 63 ;
 
-  /**/ if (freq < 0)
+  if      (freq < 0)
     freq = 0 ;
   else if (freq > 5000)	// Max 5KHz
     freq = 5000 ;

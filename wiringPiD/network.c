@@ -4,7 +4,7 @@
  *	Copyright (c) 2012-2017 Gordon Henderson
  ***********************************************************************
  * This file is part of wiringPi:
- *	https://projects.drogon.net/raspberry-pi/wiringpi/
+ *	https://github.com/WiringPi/WiringPi/
  *
  *    wiringPi is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU Lesser General Public License as published by
@@ -26,6 +26,7 @@
 #include <arpa/inet.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <string.h>
 #include <stdarg.h>
@@ -35,9 +36,6 @@
 #include <crypt.h>
 
 #include "network.h"
-
-#define	TRUE	(1==1)
-#define	FALSE	(!TRUE)
 
 // Local data
 
@@ -135,7 +133,7 @@ static int clientPrintf (const int fd, const char *message, ...)
 
 int sendGreeting (int clientFd)
 {
-  if (clientPrintf (clientFd, "200 Welcome to wiringPiD - http://wiringpi.com/\n") < 0)
+  if (clientPrintf (clientFd, "200 Welcome to wiringPiD - https://github.com/WiringPi/WiringPi/\n") < 0)
     return -1 ;
 
   return clientPrintf (clientFd, "200 Connecting from: %s\n", getClientIP ()) ;

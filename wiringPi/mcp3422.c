@@ -6,7 +6,7 @@
  *	Copyright (c) 2013-2016 Gordon Henderson
  ***********************************************************************
  * This file is part of wiringPi:
- *	https://projects.drogon.net/raspberry-pi/wiringpi/
+ *	https://github.com/WiringPi/WiringPi/
  *
  *    wiringPi is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU Lesser General Public License as
@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
 
@@ -43,15 +44,20 @@
  *********************************************************************************
  */
 
-void waitForConversion (int fd, unsigned char *buffer, int n)
+void waitForConversion(int fd, unsigned char *buffer, int n)
 {
-  for (;;)
-  {
-    read (fd, buffer, n) ;
-    if ((buffer [n-1] & 0x80) == 0)
-      break ;
-    delay (1) ;
-  }
+    for (;;) {
+        ssize_t bytes_read = read(fd, buffer, n);
+        if (bytes_read != n) {
+            perror("Error reading from file descriptor");
+            return;
+        }
+        
+        if ((buffer[n - 1] & 0x80) == 0)
+            break;
+        
+        delay(1);
+    }
 }
 
 /*
@@ -112,7 +118,7 @@ int mcp3422Setup (int pinBase, int i2cAddress, int sampleRate, int gain)
   struct wiringPiNodeStruct *node ;
 
   if ((fd = wiringPiI2CSetup (i2cAddress)) < 0)
-    return FALSE ;
+    return false ;
 
   node = wiringPiNewNode (pinBase, 4) ;
 
@@ -121,5 +127,5 @@ int mcp3422Setup (int pinBase, int i2cAddress, int sampleRate, int gain)
   node->data1      = gain ;
   node->analogRead = myAnalogRead ;
 
-  return TRUE ;
+  return true ;
 }

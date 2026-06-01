@@ -6,7 +6,7 @@
  * Copyright (c) 2013 Gordon Henderson.
  ***********************************************************************
  * This file is part of wiringPi:
- *	https://projects.drogon.net/raspberry-pi/wiringpi/
+ *	https://github.com/WiringPi/WiringPi/
  *
  *    wiringPi is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU Lesser General Public License as published by
@@ -25,17 +25,13 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <poll.h>
 
 #include <wiringPi.h>
 #include <piGlow.h>
 
 #define	PIGLOW_BASE	533
-
-#ifndef	TRUE
-#  define TRUE  (1==1)
-#  define FALSE (!TRUE)
-#endif
 
 
 /*

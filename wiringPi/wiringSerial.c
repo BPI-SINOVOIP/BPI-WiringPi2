@@ -3,7 +3,7 @@
  *	Handle a serial port
  ***********************************************************************
  * This file is part of wiringPi:
- *	https://projects.drogon.net/raspberry-pi/wiringpi/
+ *	https://github.com/WiringPi/WiringPi/
  *
  *    wiringPi is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU Lesser General Public License as published by
@@ -153,9 +153,12 @@ void serialClose (const int fd)
  *********************************************************************************
  */
 
-void serialPutchar (const int fd, const unsigned char c)
+void serialPutchar(const int fd, const unsigned char c)
 {
-  write (fd, &c, 1) ;
+    ssize_t bytes_written = write(fd, &c, 1);
+    if (bytes_written != 1) {
+      perror("Error writing to file descriptor");
+    }
 }
 
 
@@ -165,9 +168,13 @@ void serialPutchar (const int fd, const unsigned char c)
  *********************************************************************************
  */
 
-void serialPuts (const int fd, const char *s)
+void serialPuts(const int fd, const char *s)
 {
-  write (fd, s, strlen (s)) ;
+    size_t len = strlen(s);
+    ssize_t bytes_written = write(fd, s, len);
+    if (bytes_written != (ssize_t)len) {
+      perror("Error writing to file descriptor");
+    }
 }
 
 /*
