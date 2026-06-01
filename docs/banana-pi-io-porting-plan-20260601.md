@@ -69,7 +69,8 @@ The supported IO surface is:
    - confirm I2C/SPI/PWM device names for Armbian.
 5. Build checks:
    - `make -C wiringPi`
-   - `make -C gpio`
+   - `make -C devLib`
+   - `make -C gpio clean && make -C gpio INCLUDE='-I../wiringPi -I../devLib' LDFLAGS='' LIBS='../wiringPi/libwiringPi.so.3.19 ../devLib/libwiringPiDev.so.3.19 -lpthread -lrt -lm -lcrypt'`
 6. Hardware checks when available:
    - `gpio -v`
    - `gpio readall`
@@ -84,7 +85,7 @@ The supported IO surface is:
 | Board or alias set | Basis | Status | Notes |
 | --- | --- | --- | --- |
 | BPI-M1 / BPI-M1 Plus / BPI-R1 | existing A20 map | done | Existing `BPI_MODEL_M1/M1P/R1` entries. |
-| BPI-Pro | A20 Banana Pro, expected M1/M1 Plus-style header | todo | Add explicit `bpi-pro`, `banana-pro`, and `bananapro` aliases only after confirming no pinout delta. |
+| BPI-Pro | A20 Banana Pro, same GPIO layout as Banana Pi/Pro family | alias | Added `bpi-pro`, `banana-pro`, `bananapro`, `bananapi-pro`, and `bananapipro` aliases using the existing M1 Plus map; local build checks passed. |
 | BPI-M2 | existing A31s map | done | Existing `BPI_MODEL_M2`. |
 | BPI-M2 Plus H3/H2+/H5 | existing M2 Plus map | done | Aliases already present. |
 | BPI-M2 Ultra / BPI-M2 Berry | existing R40/V40 map | done | Aliases already present. |
@@ -138,7 +139,6 @@ The supported IO surface is:
 
 Start with Batch A:
 
-1. Add BPI-Pro aliases if the M1/M1 Plus pinout match is confirmed.
-2. Add BPI-CS6202/BPI-CS6204 aliases to the existing R40/M2 Ultra-compatible
+1. Add BPI-CS6202/BPI-CS6204 aliases to the existing R40/M2 Ultra-compatible
    mapping.
-3. Mirror both changes in `RPi.GPIO`.
+2. Mirror the CS6202/CS6204 change in `RPi.GPIO`.
