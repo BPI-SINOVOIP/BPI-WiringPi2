@@ -1232,7 +1232,7 @@ void bpi_pinMode (int pin, int mode)
     {
       if(pin != 6)
       {
-        printf("the pin you choose is not surport hardware PWM\n");
+        printf("the pin you choose does not support hardware PWM\n");
         printf("you can select PA6 for PWM pin\n");
         printf("or you can use it in softPwm mode\n");
         return ;
@@ -1475,7 +1475,7 @@ void bpi_pwmWrite (int pin, int value)
       return ;
     }
     if(pin != 6){
-      printf("the pin(%d) you choose is not surport hardware PWM\n", pin);
+      printf("the pin(%d) you choose does not support hardware PWM\n", pin);
       printf("you can select PA6 for PWM pin\n");
       printf("or you can use it in softPwm mode\n");
       return ;
@@ -1575,7 +1575,7 @@ struct BPIBoards bpiboard [] =
   { "bpi-m2p_H5",  10801, BPI_MODEL_M2P_H5, 1, 2, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M2P, physToGpio_BPI_M2P, pinTobcm_BPI_M2P, M2P_I2C_DEV, M2P_SPI_DEV, {M2P_PWM_OFFSET,M2P_I2C_OFFSET,M2P_SPI_OFFSET} },
   { "bpi-m2u_V40", 10901, BPI_MODEL_M2U_V40, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M2U, physToGpio_BPI_M2U, pinTobcm_BPI_M2U, M2U_I2C_DEV, M2U_SPI_DEV, {M2U_PWM_OFFSET,M2U_I2C_OFFSET,M2U_SPI_OFFSET} },
   { "bpi-m2z",	   11001, BPI_MODEL_M2Z, 1, 1, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M2P, physToGpio_BPI_M2P, pinTobcm_BPI_M2P, M2P_I2C_DEV, M2P_SPI_DEV, {M2P_PWM_OFFSET,M2P_I2C_OFFSET,M2P_SPI_OFFSET} },
-  { "bpi-r2",	   11101, BPI_MODEL_R2, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R2, physToGpio_BPI_R2, pinTobcm_BPI_R2, R2_I2C_DEV, R2_SPI_DEV, {R2_PWM_OFFSET,R2_I2C_OFFSET,R2_SPI_OFFSET} },  // !!!!! mem field is copy from M3, don't know correct num for R2
+  { "bpi-r2",	   11101, BPI_MODEL_R2, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R2, physToGpio_BPI_R2, pinTobcm_BPI_R2, R2_I2C_DEV, R2_SPI_DEV, {R2_PWM_OFFSET,R2_I2C_OFFSET,R2_SPI_OFFSET} },
   { NULL,		0, 0, 1, 2, 5, 0, NULL, NULL, NULL, NULL, NULL, {-1, -1, -1} },
 } ;
 

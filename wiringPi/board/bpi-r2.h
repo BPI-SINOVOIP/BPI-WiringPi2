@@ -119,6 +119,7 @@ int physToGpio_BPI_R2 [64] =
 #define R2_I2C_DEV             "/dev/i2c-0"
 #define R2_SPI_DEV             "/dev/spidev0.0"
 
-#define R2_I2C_OFFSET  2 // !!!!!!!!!!!!!! Copy from M3, don't know which num for R2
-#define R2_SPI_OFFSET  3 // !!!!!!!!!!!!!! Copy from M3, don't know which num for R2
-#define R2_PWM_OFFSET  2 // !!!!!!!!!!!!!! Copy from M3, don't know which num for R2
+/* R2 is MT7623; Allwinner pin function offsets do not apply. */
+#define R2_I2C_OFFSET  -1
+#define R2_SPI_OFFSET  -1
+#define R2_PWM_OFFSET  -1
