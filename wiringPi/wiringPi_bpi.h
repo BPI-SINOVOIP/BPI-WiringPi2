@@ -62,7 +62,8 @@
 #define BPI_MODEL_M7         90
 #define BPI_MODEL_W3         91
 #define BPI_MODEL_AIM7       92
-#define BPI_MODELS_MAX       93
+#define BPI_MODEL_M4SUPER    93
+#define BPI_MODELS_MAX       94
 
 #define BPI_MAKER_SINOVOIP    6
 

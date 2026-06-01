@@ -2673,6 +2673,13 @@ struct BPIBoards bpiboard [] =
   { "bananapi-aim7", 12501, BPI_MODEL_AIM7, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M7, physToGpio_BPI_M7, pinTobcm_BPI_M7, M7_I2C_DEV, M7_SPI_DEV, {M7_PWM_OFFSET,M7_I2C_OFFSET,M7_SPI_OFFSET} },
   { "armsom-aim7", 12501, BPI_MODEL_AIM7, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M7, physToGpio_BPI_M7, pinTobcm_BPI_M7, M7_I2C_DEV, M7_SPI_DEV, {M7_PWM_OFFSET,M7_I2C_OFFSET,M7_SPI_OFFSET} },
   { "armsom-aim7-io", 12501, BPI_MODEL_AIM7, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M7, physToGpio_BPI_M7, pinTobcm_BPI_M7, M7_I2C_DEV, M7_SPI_DEV, {M7_PWM_OFFSET,M7_I2C_OFFSET,M7_SPI_OFFSET} },
+  { "bpi-m4super", 12601, BPI_MODEL_M4SUPER, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M4SUPER, physToGpio_BPI_M4SUPER, pinTobcm_BPI_M4SUPER, M4SUPER_I2C_DEV, M4SUPER_SPI_DEV, {M4SUPER_PWM_OFFSET,M4SUPER_I2C_OFFSET,M4SUPER_SPI_OFFSET} },
+  { "bpi-m4-super", 12601, BPI_MODEL_M4SUPER, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M4SUPER, physToGpio_BPI_M4SUPER, pinTobcm_BPI_M4SUPER, M4SUPER_I2C_DEV, M4SUPER_SPI_DEV, {M4SUPER_PWM_OFFSET,M4SUPER_I2C_OFFSET,M4SUPER_SPI_OFFSET} },
+  { "bananapim4super", 12601, BPI_MODEL_M4SUPER, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M4SUPER, physToGpio_BPI_M4SUPER, pinTobcm_BPI_M4SUPER, M4SUPER_I2C_DEV, M4SUPER_SPI_DEV, {M4SUPER_PWM_OFFSET,M4SUPER_I2C_OFFSET,M4SUPER_SPI_OFFSET} },
+  { "banana-pi-m4-super", 12601, BPI_MODEL_M4SUPER, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M4SUPER, physToGpio_BPI_M4SUPER, pinTobcm_BPI_M4SUPER, M4SUPER_I2C_DEV, M4SUPER_SPI_DEV, {M4SUPER_PWM_OFFSET,M4SUPER_I2C_OFFSET,M4SUPER_SPI_OFFSET} },
+  { "bananapi-m4super", 12601, BPI_MODEL_M4SUPER, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M4SUPER, physToGpio_BPI_M4SUPER, pinTobcm_BPI_M4SUPER, M4SUPER_I2C_DEV, M4SUPER_SPI_DEV, {M4SUPER_PWM_OFFSET,M4SUPER_I2C_OFFSET,M4SUPER_SPI_OFFSET} },
+  { "bananapi-m4-super", 12601, BPI_MODEL_M4SUPER, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M4SUPER, physToGpio_BPI_M4SUPER, pinTobcm_BPI_M4SUPER, M4SUPER_I2C_DEV, M4SUPER_SPI_DEV, {M4SUPER_PWM_OFFSET,M4SUPER_I2C_OFFSET,M4SUPER_SPI_OFFSET} },
+  { "armsom-sige3", 12601, BPI_MODEL_M4SUPER, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M4SUPER, physToGpio_BPI_M4SUPER, pinTobcm_BPI_M4SUPER, M4SUPER_I2C_DEV, M4SUPER_SPI_DEV, {M4SUPER_PWM_OFFSET,M4SUPER_I2C_OFFSET,M4SUPER_SPI_OFFSET} },
   { "bpi-r2",	   11101, BPI_MODEL_R2, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R2, physToGpio_BPI_R2, pinTobcm_BPI_R2, R2_I2C_DEV, R2_SPI_DEV, {R2_PWM_OFFSET,R2_I2C_OFFSET,R2_SPI_OFFSET} },
   { NULL,		0, 0, 1, 2, 5, 0, NULL, NULL, NULL, NULL, NULL, {-1, -1, -1} },
 } ;
@@ -2705,6 +2712,7 @@ static int bpi_model_is_rk3588(int model)
 static int bpi_model_is_rockchip(int model)
 {
   return model == BPI_MODEL_R2PRO ||
+      model == BPI_MODEL_M4SUPER ||
       bpi_model_is_rk3576(model) ||
       bpi_model_is_rk3588(model);
 }
@@ -2809,6 +2817,17 @@ static struct BPIBoards *bpi_find_board_by_model_string(const char *hardware)
       strstr(hardware, "armsom,aim7") ||
       strstr(hardware, "rk3588-armsom-aim7-io"))
     return bpi_find_board_by_name("bpi-aim7");
+
+  if (strstr(hardware, "Banana Pi BPI-M4 Super") ||
+      strstr(hardware, "BananaPi BPI-M4 Super") ||
+      strstr(hardware, "Banana Pi M4 Super") ||
+      strstr(hardware, "BananaPi M4 Super") ||
+      strstr(hardware, "BPI-M4 Super") ||
+      strstr(hardware, "ArmSom Sige3") ||
+      strstr(hardware, "ArmSoM Sige3") ||
+      strstr(hardware, "armsom,sige3") ||
+      strstr(hardware, "rk3568-armsom-sige3"))
+    return bpi_find_board_by_name("bpi-m4-super");
 
   if (strstr(hardware, "Banana Pi BPI-M5") ||
       strstr(hardware, "BananaPi BPI-M5") ||
