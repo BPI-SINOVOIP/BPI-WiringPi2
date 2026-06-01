@@ -146,7 +146,7 @@ The supported IO surface is:
 | BPI-R3 | done | Added MT7986 GPIO support by reusing the MTK GPIO v2 mmap backend (`pio@1001f000`) and the official R3 26-pin GPIO image (`r3_gpio_40.jpg`). Basic mode/input/output/read/write build-tested. Pull/PWM remain no-op pending hardware validation. I2C metadata is `/dev/i2c-0`; SPI metadata is `/dev/spidev0.0`, pending Armbian device-node validation. |
 | BPI-R3 Mini | blocked | Official docs only show generic sysfs GPIO examples and board interfaces; no authoritative 26/40-pin expansion header map was found. Do not alias it to R3 without a confirmed carrier/header map. |
 | BPI-R64 | done | Added MT7622 GPIO support using the official R64 40-pin GPIO image (`r64_gpio_40.jpg`) and mainline `pinctrl-mt7622` register ranges (`pinctrl@10211000`). Mode/input/output/read/write and pull-up/down build-tested. I2C metadata is `/dev/i2c-0`; SPI metadata is `/dev/spidev0.0`, pending Armbian device-node validation. |
-| BPI-R4 Lite | todo | MT7987/MikroBUS 2x8 needs a separate policy/map; it is not a Raspberry Pi 26/40-pin header. |
+| BPI-R4 Lite | done | Added MT7987 GPIO v2 support by reusing the MTK v2 mmap backend (`pio@1001f000`) and the Armbian 6.17 `mt7987a-bananapi-bpi-r4-lite-mikrobus.dtsi` map. BOARD mode follows the 2x8 MikroBUS physical pins 1-16; GPIO-capable pins are 5/6/7/8/10/11/12/13/14 only. I2C metadata is `/dev/i2c-3`; SPI metadata is `/dev/spidev1.0`, pending hardware device-node validation. |
 | BPI-R4 Pro | todo | MT7988 backend should be reusable, but the Pro-specific header/export map must be confirmed before adding aliases. |
 | BPI-R2 Mini / R4 Mini / OpenWrt One | blocked | Armbian target is blocked/deferred; wait for board files and IO header policy. |
 | BPI-WiFi5 / WiFi6 / RT2 / RV2 | deferred | Router/OpenWrt image flows; no generic WiringPi target until IO header requirement is defined. |
@@ -154,7 +154,7 @@ The supported IO surface is:
 
 ## Current Next Item
 
-Continue Batch E router/service-header review from `BPI-R4 Lite`.
+Continue Batch E router/service-header review from `BPI-R4 Pro`.
 
 Resume sequence:
 

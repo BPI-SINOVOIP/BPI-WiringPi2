@@ -3901,6 +3901,12 @@ struct BPIBoards bpiboard [] =
   { "bananapir64", 13801, BPI_MODEL_R64, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R64, physToGpio_BPI_R64, pinTobcm_BPI_R64, R64_I2C_DEV, R64_SPI_DEV, {R64_PWM_OFFSET,R64_I2C_OFFSET,R64_SPI_OFFSET} },
   { "bananapi-r64", 13801, BPI_MODEL_R64, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R64, physToGpio_BPI_R64, pinTobcm_BPI_R64, R64_I2C_DEV, R64_SPI_DEV, {R64_PWM_OFFSET,R64_I2C_OFFSET,R64_SPI_OFFSET} },
   { "banana-pi-r64", 13801, BPI_MODEL_R64, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R64, physToGpio_BPI_R64, pinTobcm_BPI_R64, R64_I2C_DEV, R64_SPI_DEV, {R64_PWM_OFFSET,R64_I2C_OFFSET,R64_SPI_OFFSET} },
+  { "bpi-r4lite",  13901, BPI_MODEL_R4LITE, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R4LITE, physToGpio_BPI_R4LITE, pinTobcm_BPI_R4LITE, R4LITE_I2C_DEV, R4LITE_SPI_DEV, {R4LITE_PWM_OFFSET,R4LITE_I2C_OFFSET,R4LITE_SPI_OFFSET} },
+  { "bpi-r4-lite", 13901, BPI_MODEL_R4LITE, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R4LITE, physToGpio_BPI_R4LITE, pinTobcm_BPI_R4LITE, R4LITE_I2C_DEV, R4LITE_SPI_DEV, {R4LITE_PWM_OFFSET,R4LITE_I2C_OFFSET,R4LITE_SPI_OFFSET} },
+  { "bananapir4lite", 13901, BPI_MODEL_R4LITE, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R4LITE, physToGpio_BPI_R4LITE, pinTobcm_BPI_R4LITE, R4LITE_I2C_DEV, R4LITE_SPI_DEV, {R4LITE_PWM_OFFSET,R4LITE_I2C_OFFSET,R4LITE_SPI_OFFSET} },
+  { "bananapi-r4lite", 13901, BPI_MODEL_R4LITE, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R4LITE, physToGpio_BPI_R4LITE, pinTobcm_BPI_R4LITE, R4LITE_I2C_DEV, R4LITE_SPI_DEV, {R4LITE_PWM_OFFSET,R4LITE_I2C_OFFSET,R4LITE_SPI_OFFSET} },
+  { "bananapi-r4-lite", 13901, BPI_MODEL_R4LITE, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R4LITE, physToGpio_BPI_R4LITE, pinTobcm_BPI_R4LITE, R4LITE_I2C_DEV, R4LITE_SPI_DEV, {R4LITE_PWM_OFFSET,R4LITE_I2C_OFFSET,R4LITE_SPI_OFFSET} },
+  { "banana-pi-r4-lite", 13901, BPI_MODEL_R4LITE, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R4LITE, physToGpio_BPI_R4LITE, pinTobcm_BPI_R4LITE, R4LITE_I2C_DEV, R4LITE_SPI_DEV, {R4LITE_PWM_OFFSET,R4LITE_I2C_OFFSET,R4LITE_SPI_OFFSET} },
   { "bpi-r2",	   11101, BPI_MODEL_R2, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R2, physToGpio_BPI_R2, pinTobcm_BPI_R2, R2_I2C_DEV, R2_SPI_DEV, {R2_PWM_OFFSET,R2_I2C_OFFSET,R2_SPI_OFFSET} },
   { NULL,		0, 0, 1, 2, 5, 0, NULL, NULL, NULL, NULL, NULL, {-1, -1, -1} },
 } ;
@@ -4269,6 +4275,20 @@ static struct BPIBoards *bpi_find_board_by_model_string(const char *hardware)
       strstr(hardware, "BPI-AI2N"))
     return bpi_find_board_by_name("bpi-ai2n");
 
+  if (strstr(hardware, "Bananapi BPI-R4-LITE") ||
+      strstr(hardware, "Bananapi BPI-R4 Lite") ||
+      strstr(hardware, "BananaPi BPI-R4-LITE") ||
+      strstr(hardware, "BananaPi BPI-R4 Lite") ||
+      strstr(hardware, "Banana Pi BPI-R4 Lite") ||
+      strstr(hardware, "BananaPi R4 Lite") ||
+      strstr(hardware, "Banana Pi R4 Lite") ||
+      strstr(hardware, "BPI-R4-LITE") ||
+      strstr(hardware, "BPI-R4 Lite") ||
+      strstr(hardware, "BPI-R4_Lite") ||
+      strstr(hardware, "bananapi,bpi-r4-lite") ||
+      strstr(hardware, "mt7987a-bananapi-bpi-r4-lite"))
+    return bpi_find_board_by_name("bpi-r4-lite");
+
   if (strstr(hardware, "Bananapi BPI-R4") ||
       strstr(hardware, "BananaPi BPI-R4") ||
       strstr(hardware, "Banana Pi BPI-R4") ||
@@ -4406,7 +4426,8 @@ void bpi_piBoardId (int *model, int *rev, int *mem, int *maker, int *warranty)
     pinTobcm_BP = board->pinTobcm ;
     bpi_found_mtk = (board->model == BPI_MODEL_R2);
     bpi_found_mtk_v2 = (board->model == BPI_MODEL_R4 ||
-                         board->model == BPI_MODEL_R3);
+                         board->model == BPI_MODEL_R3 ||
+                         board->model == BPI_MODEL_R4LITE);
     bpi_found_mtk_mt7622 = (board->model == BPI_MODEL_R64);
     bpi_found_sun50iw9 = (board->model == BPI_MODEL_M4BERRY || board->model == BPI_MODEL_M4ZERO);
     bpi_found_meson = (board->model == BPI_MODEL_M2S ||
