@@ -344,6 +344,7 @@ const char piModelNamesShort[PI_MODELS_MAX][11] =
   [BPI_MODEL_CM6] = "---CM6---",
   [BPI_MODEL_R4] = "---R4----",
   [BPI_MODEL_R3] = "---R3----",
+  [BPI_MODEL_R64] = "---R64---",
 } ;
 
 static void plus2header (int model)
