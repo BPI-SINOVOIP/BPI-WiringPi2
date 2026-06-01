@@ -407,6 +407,7 @@ const char *piModelNames [PI_MODELS_MAX] =
   [BPI_MODEL_M1SUPER] = "Banana Pi M1 Super[RK3528]",
   [BPI_MODEL_FORGE1]  = "Banana Pi Forge1[RK3506J]",
   [BPI_MODEL_P2PRO]   = "Banana Pi P2 Pro[RK3308]",
+  [BPI_MODEL_W2]      = "Banana Pi W2[RTD1296]",
 #endif
 } ;
 
