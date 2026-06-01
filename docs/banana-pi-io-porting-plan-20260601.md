@@ -142,15 +142,12 @@ The supported IO surface is:
 
 ## Current Next Item
 
-Continue Batch C by mirroring `BPI-M7` into `RPi.GPIO`, then continue with
-`BPI-W3 / AIM7 / LM7`.
+Continue Batch C from `BPI-W3 / AIM7 / LM7`.
 
 Resume sequence:
 
-1. Add the completed `BPI-M7` RK3588 backend/map in `RPi.GPIO`, build-test,
-   commit, and push.
-2. Confirm exact 40-pin/carrier maps for `BPI-W3 / AIM7 / LM7`.
-3. Add one board or exact carrier alias set at a time in both repos,
+1. Confirm exact 40-pin/carrier maps for `BPI-W3 / AIM7 / LM7`.
+2. Add one board or exact carrier alias set at a time in both repos,
    build-test, commit, and push each repo.
-4. If a carrier map is not reliable from available sources,
+3. If a carrier map is not reliable from available sources,
    mark the row blocked with the exact missing item instead of guessing.
