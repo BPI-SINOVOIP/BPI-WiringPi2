@@ -102,7 +102,7 @@ The supported IO surface is:
 | Board group | SoC family | Status | Notes |
 | --- | --- | --- | --- |
 | BPI-M4 Berry | Allwinner H618 | done | Added initial H618 GPIO mmap path, board aliases, DT model detection, and 40-pin GPIO map from official BPI docs/Dangku reference; local build checks passed. Hardware PWM remains guarded pending H618 PWM backend wiring. |
-| BPI-M4 Zero | Allwinner H618 | todo | Same H618 backend; needs separate Zero header map and DT model strings. |
+| BPI-M4 Zero | Allwinner H618 | done | Added H618 GPIO map, board aliases, DT model detection, and local build checks. Hardware PWM remains guarded pending H618 PWM backend wiring. |
 | BPI-CM4IO / BPI-M2S | Amlogic G12B | todo | Needs meson GPIO backend and carrier-specific 40-pin map. |
 | BPI-M2 Pro / BPI-M5 | Amlogic SM1 | todo | Likely shares meson backend, but board maps must be checked individually. |
 | BPI-F3 | SpacemiT K1 | todo | Needs K1 GPIO backend and official header map. |

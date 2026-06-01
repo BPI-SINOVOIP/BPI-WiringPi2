@@ -1605,6 +1605,9 @@ struct BPIBoards bpiboard [] =
   { "bpi-m4berry", 11201, BPI_MODEL_M4BERRY, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M4BERRY, physToGpio_BPI_M4BERRY, pinTobcm_BPI_M4BERRY, M4BERRY_I2C_DEV, M4BERRY_SPI_DEV, {M4BERRY_PWM_OFFSET,M4BERRY_I2C_OFFSET,M4BERRY_SPI_OFFSET} },
   { "bpi-m4-berry", 11201, BPI_MODEL_M4BERRY, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M4BERRY, physToGpio_BPI_M4BERRY, pinTobcm_BPI_M4BERRY, M4BERRY_I2C_DEV, M4BERRY_SPI_DEV, {M4BERRY_PWM_OFFSET,M4BERRY_I2C_OFFSET,M4BERRY_SPI_OFFSET} },
   { "bananapim4berry", 11201, BPI_MODEL_M4BERRY, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M4BERRY, physToGpio_BPI_M4BERRY, pinTobcm_BPI_M4BERRY, M4BERRY_I2C_DEV, M4BERRY_SPI_DEV, {M4BERRY_PWM_OFFSET,M4BERRY_I2C_OFFSET,M4BERRY_SPI_OFFSET} },
+  { "bpi-m4zero", 11301, BPI_MODEL_M4ZERO, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M4ZERO, physToGpio_BPI_M4ZERO, pinTobcm_BPI_M4ZERO, M4ZERO_I2C_DEV, M4ZERO_SPI_DEV, {M4ZERO_PWM_OFFSET,M4ZERO_I2C_OFFSET,M4ZERO_SPI_OFFSET} },
+  { "bpi-m4-zero", 11301, BPI_MODEL_M4ZERO, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M4ZERO, physToGpio_BPI_M4ZERO, pinTobcm_BPI_M4ZERO, M4ZERO_I2C_DEV, M4ZERO_SPI_DEV, {M4ZERO_PWM_OFFSET,M4ZERO_I2C_OFFSET,M4ZERO_SPI_OFFSET} },
+  { "bananapim4zero", 11301, BPI_MODEL_M4ZERO, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M4ZERO, physToGpio_BPI_M4ZERO, pinTobcm_BPI_M4ZERO, M4ZERO_I2C_DEV, M4ZERO_SPI_DEV, {M4ZERO_PWM_OFFSET,M4ZERO_I2C_OFFSET,M4ZERO_SPI_OFFSET} },
   { "bpi-r2",	   11101, BPI_MODEL_R2, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R2, physToGpio_BPI_R2, pinTobcm_BPI_R2, R2_I2C_DEV, R2_SPI_DEV, {R2_PWM_OFFSET,R2_I2C_OFFSET,R2_SPI_OFFSET} },
   { NULL,		0, 0, 1, 2, 5, 0, NULL, NULL, NULL, NULL, NULL, {-1, -1, -1} },
 } ;
@@ -1628,6 +1631,12 @@ static struct BPIBoards *bpi_find_board_by_model_string(const char *hardware)
       strstr(hardware, "Banana Pi BPI-M4 Berry") ||
       strstr(hardware, "BPI-M4Berry"))
     return bpi_find_board_by_name("bpi-m4berry");
+
+  if (strstr(hardware, "BananaPi BPI-M4-Zero") ||
+      strstr(hardware, "Banana Pi BPI-M4-Zero") ||
+      strstr(hardware, "BananaPi M4 Zero") ||
+      strstr(hardware, "BPI-M4Zero"))
+    return bpi_find_board_by_name("bpi-m4zero");
 
   return NULL;
 }
@@ -1711,7 +1720,7 @@ void bpi_piBoardId (int *model, int *rev, int *mem, int *maker, int *warranty)
     physToGpio_BP = board->physToGpio ;
     pinTobcm_BP = board->pinTobcm ;
     bpi_found_mtk = (board->model == BPI_MODEL_R2);
-    bpi_found_sun50iw9 = (board->model == BPI_MODEL_M4BERRY);
+    bpi_found_sun50iw9 = (board->model == BPI_MODEL_M4BERRY || board->model == BPI_MODEL_M4ZERO);
     //printf("BPI: name[%s] bType(%d) model(%d)\n",board->name, bType, board->model);
     *model    = bType ;
     *rev      = bRev ;
