@@ -234,6 +234,7 @@ int *pinTobcm_BP ;
 #define ROCKCHIP_GPIO_PIN_END          159
 #define ROCKCHIP_GPIO_MAP_SIZE_RK3568  0x100
 #define ROCKCHIP_GPIO_MAP_SIZE_RK3528  0x200
+#define ROCKCHIP_GPIO_MAP_SIZE_RK3506  0x200
 #define ROCKCHIP_GPIO_MAP_SIZE_RK3576  0x200
 #define ROCKCHIP_GPIO_MAP_SIZE_RK3588  0x100
 
@@ -301,6 +302,13 @@ static const off_t rockchip_gpio_base_rk3528[ROCKCHIP_GPIO_BANKS] = {
   0xffb00000,
   0xffb10000,
   0xffb20000,
+};
+static const off_t rockchip_gpio_base_rk3506[ROCKCHIP_GPIO_BANKS] = {
+  0xff940000,
+  0xff870000,
+  0xff1c0000,
+  0xff1d0000,
+  0xff1e0000,
 };
 static const off_t rockchip_gpio_base_rk3576[ROCKCHIP_GPIO_BANKS] = {
   0x27320000,
@@ -2697,6 +2705,11 @@ struct BPIBoards bpiboard [] =
   { "bananapi-m1-super", 12701, BPI_MODEL_M1SUPER, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M1SUPER, physToGpio_BPI_M1SUPER, pinTobcm_BPI_M1SUPER, M1SUPER_I2C_DEV, M1SUPER_SPI_DEV, {M1SUPER_PWM_OFFSET,M1SUPER_I2C_OFFSET,M1SUPER_SPI_OFFSET} },
   { "bananapi-m1s", 12701, BPI_MODEL_M1SUPER, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M1SUPER, physToGpio_BPI_M1SUPER, pinTobcm_BPI_M1SUPER, M1SUPER_I2C_DEV, M1SUPER_SPI_DEV, {M1SUPER_PWM_OFFSET,M1SUPER_I2C_OFFSET,M1SUPER_SPI_OFFSET} },
   { "armsom-sige1", 12701, BPI_MODEL_M1SUPER, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M1SUPER, physToGpio_BPI_M1SUPER, pinTobcm_BPI_M1SUPER, M1SUPER_I2C_DEV, M1SUPER_SPI_DEV, {M1SUPER_PWM_OFFSET,M1SUPER_I2C_OFFSET,M1SUPER_SPI_OFFSET} },
+  { "bpi-forge1", 12801, BPI_MODEL_FORGE1, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M1SUPER, physToGpio_BPI_M1SUPER, pinTobcm_BPI_M1SUPER, M1SUPER_I2C_DEV, M1SUPER_SPI_DEV, {M1SUPER_PWM_OFFSET,M1SUPER_I2C_OFFSET,M1SUPER_SPI_OFFSET} },
+  { "bananapiforge1", 12801, BPI_MODEL_FORGE1, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M1SUPER, physToGpio_BPI_M1SUPER, pinTobcm_BPI_M1SUPER, M1SUPER_I2C_DEV, M1SUPER_SPI_DEV, {M1SUPER_PWM_OFFSET,M1SUPER_I2C_OFFSET,M1SUPER_SPI_OFFSET} },
+  { "banana-pi-forge1", 12801, BPI_MODEL_FORGE1, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M1SUPER, physToGpio_BPI_M1SUPER, pinTobcm_BPI_M1SUPER, M1SUPER_I2C_DEV, M1SUPER_SPI_DEV, {M1SUPER_PWM_OFFSET,M1SUPER_I2C_OFFSET,M1SUPER_SPI_OFFSET} },
+  { "bananapi-forge1", 12801, BPI_MODEL_FORGE1, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M1SUPER, physToGpio_BPI_M1SUPER, pinTobcm_BPI_M1SUPER, M1SUPER_I2C_DEV, M1SUPER_SPI_DEV, {M1SUPER_PWM_OFFSET,M1SUPER_I2C_OFFSET,M1SUPER_SPI_OFFSET} },
+  { "armsom-forge1", 12801, BPI_MODEL_FORGE1, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M1SUPER, physToGpio_BPI_M1SUPER, pinTobcm_BPI_M1SUPER, M1SUPER_I2C_DEV, M1SUPER_SPI_DEV, {M1SUPER_PWM_OFFSET,M1SUPER_I2C_OFFSET,M1SUPER_SPI_OFFSET} },
   { "bpi-r2",	   11101, BPI_MODEL_R2, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R2, physToGpio_BPI_R2, pinTobcm_BPI_R2, R2_I2C_DEV, R2_SPI_DEV, {R2_PWM_OFFSET,R2_I2C_OFFSET,R2_SPI_OFFSET} },
   { NULL,		0, 0, 1, 2, 5, 0, NULL, NULL, NULL, NULL, NULL, {-1, -1, -1} },
 } ;
@@ -2724,6 +2737,11 @@ static int bpi_model_is_rk3528(int model)
   return model == BPI_MODEL_M1SUPER;
 }
 
+static int bpi_model_is_rk3506(int model)
+{
+  return model == BPI_MODEL_FORGE1;
+}
+
 static int bpi_model_is_rk3588(int model)
 {
   return model == BPI_MODEL_M7 ||
@@ -2735,6 +2753,7 @@ static int bpi_model_is_rockchip(int model)
 {
   return model == BPI_MODEL_R2PRO ||
       model == BPI_MODEL_M4SUPER ||
+      bpi_model_is_rk3506(model) ||
       bpi_model_is_rk3528(model) ||
       bpi_model_is_rk3576(model) ||
       bpi_model_is_rk3588(model);
@@ -2742,6 +2761,13 @@ static int bpi_model_is_rockchip(int model)
 
 static void bpi_select_rockchip_backend(int model)
 {
+  if (bpi_model_is_rk3506(model))
+  {
+    rockchip_gpio_base = rockchip_gpio_base_rk3506;
+    rockchip_gpio_map_size = ROCKCHIP_GPIO_MAP_SIZE_RK3506;
+    return;
+  }
+
   if (bpi_model_is_rk3528(model))
   {
     rockchip_gpio_base = rockchip_gpio_base_rk3528;
@@ -2874,6 +2900,19 @@ static struct BPIBoards *bpi_find_board_by_model_string(const char *hardware)
       strstr(hardware, "armsom,sige1") ||
       strstr(hardware, "rk3528-armsom-sige1"))
     return bpi_find_board_by_name("bpi-m1-super");
+
+  if (strstr(hardware, "Banana Pi BPI-Forge1") ||
+      strstr(hardware, "BananaPi BPI-Forge1") ||
+      strstr(hardware, "Banana Pi Forge1") ||
+      strstr(hardware, "BananaPi Forge1") ||
+      strstr(hardware, "BPI-Forge1") ||
+      strstr(hardware, "ArmSom Forge1") ||
+      strstr(hardware, "ArmSoM Forge1") ||
+      strstr(hardware, "armsom,forge1") ||
+      strstr(hardware, "rockchip,rk3506J-armsom-forge1") ||
+      strstr(hardware, "rockchip,rk3506j-armsom-forge1") ||
+      strstr(hardware, "rk3506b-armsom-forge1"))
+    return bpi_find_board_by_name("bpi-forge1");
 
   if (strstr(hardware, "Banana Pi BPI-M5") ||
       strstr(hardware, "BananaPi BPI-M5") ||

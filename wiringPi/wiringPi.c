@@ -405,6 +405,7 @@ const char *piModelNames [PI_MODELS_MAX] =
   [BPI_MODEL_AIM7]    = "Banana Pi AIM7[RK3588]",
   [BPI_MODEL_M4SUPER] = "Banana Pi M4 Super[RK3568]",
   [BPI_MODEL_M1SUPER] = "Banana Pi M1 Super[RK3528]",
+  [BPI_MODEL_FORGE1]  = "Banana Pi Forge1[RK3506J]",
 #endif
 } ;
 
