@@ -68,7 +68,8 @@
 #define BPI_MODEL_P2PRO      96
 #define BPI_MODEL_W2         97
 #define BPI_MODEL_M4         98
-#define BPI_MODELS_MAX       99
+#define BPI_MODEL_M6         99
+#define BPI_MODELS_MAX       100
 
 #define BPI_MAKER_SINOVOIP    6
 

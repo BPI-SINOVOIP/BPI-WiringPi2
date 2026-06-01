@@ -259,6 +259,17 @@ int *pinTobcm_BP ;
 #define REALTEK_RTD139X_ISO_PIN_BASE   0
 #define REALTEK_RTD139X_ISO_PIN_END    56
 
+// Synaptics VS680 DW APB GPIO
+#define VS680_GPIO_BANKS               4
+#define VS680_GPIO_MAP_SIZE            0x400
+#define VS680_GPIO_SOC_PIN_BASE        0
+#define VS680_GPIO_SOC_PIN_END         95
+#define VS680_GPIO_SM_PIN_BASE         96
+#define VS680_GPIO_SM_PIN_END          127
+#define VS680_GPIO_SWPORT_DR           0x00
+#define VS680_GPIO_SWPORT_DDR          0x04
+#define VS680_GPIO_EXT_PORT            0x50
+
 struct realtek_gpio_group
 {
   int pin_base;
@@ -310,6 +321,7 @@ static int bpi_found_spacemit = 0 ;
 static int bpi_found_renesas = 0 ;
 static int bpi_found_rockchip = 0 ;
 static int bpi_found_realtek = 0 ;
+static int bpi_found_vs680 = 0 ;
 static uint8_t *mtk_gpio_base = NULL ;
 static volatile uint32_t *meson_gpio = NULL ;
 static volatile uint32_t *meson_gpioao = NULL ;
@@ -318,6 +330,7 @@ static volatile uint32_t *spacemit_pinctrl = NULL ;
 static volatile uint32_t *renesas_gpio = NULL ;
 static volatile uint32_t *rockchip_gpio[ROCKCHIP_GPIO_BANKS] = { NULL };
 static volatile uint32_t *realtek_gpio[REALTEK_GPIO_GROUPS] = { NULL };
+static volatile uint32_t *vs680_gpio[VS680_GPIO_BANKS] = { NULL };
 static const off_t rockchip_gpio_base_rk3308[ROCKCHIP_GPIO_BANKS] = {
   0xff220000,
   0xff230000,
@@ -407,6 +420,12 @@ static const struct realtek_gpio_group realtek_rtd139x_groups[1] = {
 static const off_t realtek_gpio_base_rtd139x[REALTEK_GPIO_GROUPS] = {
   REALTEK_RTD139X_ISO_BASE,
   0,
+};
+static const off_t vs680_gpio_base[VS680_GPIO_BANKS] = {
+  0xf7e82400,
+  0xf7e80800,
+  0xf7e80c00,
+  0xf7fc8000,
 };
 static const struct realtek_gpio_group *realtek_gpio_groups = realtek_rtd129x_groups;
 static const off_t *realtek_gpio_base = realtek_gpio_base_rtd129x;
@@ -2112,6 +2131,139 @@ static void realtek_digitalWrite(int pin, int value)
   realtek_write_bit(group, group->dato_offset[index], bit, value != LOW);
 }
 
+static int vs680_is_pin(int pin)
+{
+  return (pin >= VS680_GPIO_SOC_PIN_BASE && pin <= VS680_GPIO_SOC_PIN_END) ||
+      (pin >= VS680_GPIO_SM_PIN_BASE && pin <= VS680_GPIO_SM_PIN_END);
+}
+
+static int vs680_pin_bank(int pin)
+{
+  if (pin >= VS680_GPIO_SOC_PIN_BASE && pin <= VS680_GPIO_SOC_PIN_END)
+    return pin >> 5;
+
+  if (pin >= VS680_GPIO_SM_PIN_BASE && pin <= VS680_GPIO_SM_PIN_END)
+    return 3;
+
+  return -1;
+}
+
+static int vs680_pin_bit(int pin)
+{
+  if (pin >= VS680_GPIO_SM_PIN_BASE)
+    return pin - VS680_GPIO_SM_PIN_BASE;
+
+  return pin & 0x1f;
+}
+
+static int vs680_gpio_mapped(void)
+{
+  int i;
+
+  for (i = 0; i < VS680_GPIO_BANKS; ++i)
+    if (vs680_gpio[i] == NULL)
+      return 0;
+
+  return 1;
+}
+
+static uint32_t vs680_read_reg(int bank, int offset)
+{
+  volatile uint32_t *regs;
+
+  if (bank < 0 || bank >= VS680_GPIO_BANKS)
+    return 0;
+
+  regs = vs680_gpio[bank];
+  if (regs == NULL)
+    return 0;
+
+  return regs[offset >> 2];
+}
+
+static void vs680_write_bit(int bank, int offset, int bit, int value)
+{
+  volatile uint32_t *regs;
+  uint32_t data;
+
+  if (bank < 0 || bank >= VS680_GPIO_BANKS)
+    return;
+
+  regs = vs680_gpio[bank];
+  if (regs == NULL)
+    return;
+
+  data = regs[offset >> 2];
+  if (value)
+    data |= (1u << bit);
+  else
+    data &= ~(1u << bit);
+  regs[offset >> 2] = data;
+}
+
+static void vs680_set_pin_alt(int pin, int mode)
+{
+  (void)pin;
+  (void)mode;
+}
+
+static void vs680_set_pin_mode(int pin, int mode)
+{
+  int bank, bit;
+
+  if (!vs680_is_pin(pin) || !vs680_gpio_mapped())
+    return;
+
+  if (mode != INPUT && mode != OUTPUT)
+    return;
+
+  bank = vs680_pin_bank(pin);
+  bit = vs680_pin_bit(pin);
+  vs680_write_bit(bank, VS680_GPIO_SWPORT_DDR, bit, mode == OUTPUT);
+}
+
+static int vs680_get_pin_mode(int pin)
+{
+  int bank, bit;
+
+  if (!vs680_is_pin(pin) || !vs680_gpio_mapped())
+    return INPUT;
+
+  bank = vs680_pin_bank(pin);
+  bit = vs680_pin_bit(pin);
+  return (vs680_read_reg(bank, VS680_GPIO_SWPORT_DDR) & (1u << bit)) ? OUTPUT : INPUT;
+}
+
+static void vs680_pullUpDnControl(int pin, int pud)
+{
+  (void)pin;
+  (void)pud;
+}
+
+static int vs680_digitalRead(int pin)
+{
+  int bank, bit;
+
+  if (!vs680_is_pin(pin) || !vs680_gpio_mapped())
+    return LOW;
+
+  bank = vs680_pin_bank(pin);
+  bit = vs680_pin_bit(pin);
+  return (vs680_read_reg(bank, VS680_GPIO_EXT_PORT) & (1u << bit)) ? HIGH : LOW;
+}
+
+static void vs680_digitalWrite(int pin, int value)
+{
+  int bank, bit;
+
+  if (!vs680_is_pin(pin) || !vs680_gpio_mapped())
+    return;
+
+  bank = vs680_pin_bank(pin);
+  bit = vs680_pin_bit(pin);
+  vs680_write_bit(bank, VS680_GPIO_SWPORT_DR, bit, value != LOW);
+}
+
 #ifdef BPI
 
 int bpi_getAlt (int pin)
@@ -2145,6 +2297,8 @@ int bpi_getAlt (int pin)
     return rockchip_get_pin_mode(pin);
   if (bpi_found_realtek)
     return realtek_get_pin_mode(pin);
+  if (bpi_found_vs680)
+    return vs680_get_pin_mode(pin);
 
   alt=sunxi_get_pin_mode(pin);
   return alt ;
@@ -2153,7 +2307,7 @@ int bpi_getAlt (int pin)
 
 void bpi_pwmSetMode (int mode)
 {
-  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek)
+  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek || bpi_found_vs680)
     return;
 
   sunxi_pwm_set_mode(mode);
@@ -2163,7 +2317,7 @@ void bpi_pwmSetMode (int mode)
 
 void bpi_pwmSetRange (unsigned int range)
 {
-  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek)
+  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek || bpi_found_vs680)
     return;
 
   sunxi_pwm_set_period(range);
@@ -2173,7 +2327,7 @@ void bpi_pwmSetRange (unsigned int range)
 
 void bpi_pwmSetClock (int divisor)
 {
-  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek)
+  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek || bpi_found_vs680)
     return;
 
   sunxi_pwm_set_clk(divisor);
@@ -2271,6 +2425,11 @@ void bpi_pinModeAlt (int pin, int mode)
     if (bpi_found_realtek)
     {
       realtek_set_pin_alt(pin, mode);
+      return;
+    }
+    if (bpi_found_vs680)
+    {
+      vs680_set_pin_alt(pin, mode);
       return;
     }
     sunxi_set_pin_alt(pin,mode);
@@ -2460,6 +2619,32 @@ void bpi_pinMode (int pin, int mode)
       return;
     }
 
+    if (bpi_found_vs680)
+    {
+      if (mode == INPUT || mode == OUTPUT)
+      {
+        vs680_set_pin_mode(pin, mode);
+      }
+      else if (mode == PULLUP)
+      {
+        vs680_pullUpDnControl(pin, PUD_UP);
+      }
+      else if (mode == PULLDOWN)
+      {
+        vs680_pullUpDnControl(pin, PUD_DOWN);
+      }
+      else if (mode == PULLOFF)
+      {
+        vs680_pullUpDnControl(pin, PUD_OFF);
+      }
+      else
+      {
+        return;
+      }
+      wiringPinMode = mode;
+      return;
+    }
+
     if (mode == INPUT)
     {
       sunxi_set_pin_mode(pin,INPUT);
@@ -2580,6 +2765,11 @@ void bpi_pullUpDnControl (int pin, int pud)
       realtek_pullUpDnControl(pin, pud);
       return;
     }
+    if (bpi_found_vs680)
+    {
+      vs680_pullUpDnControl(pin, pud);
+      return;
+    }
     sunxi_pullUpDnControl(pin, pud);
     return;
   }
@@ -2650,6 +2840,8 @@ int bpi_digitalRead (int pin)
       return rockchip_digitalRead(pin);
     if (bpi_found_realtek)
       return realtek_digitalRead(pin);
+    if (bpi_found_vs680)
+      return vs680_digitalRead(pin);
 
     return sunxi_digitalRead(pin);
   }
@@ -2736,6 +2928,11 @@ void bpi_digitalWrite (int pin, int value)
       realtek_digitalWrite(pin, value);
       return;
     }
+    if (bpi_found_vs680)
+    {
+      vs680_digitalWrite(pin, value);
+      return;
+    }
     sunxi_digitalWrite(pin, value); 
   }
   else
@@ -2752,7 +2949,7 @@ void bpi_pwmWrite (int pin, int value)
 
   uint32_t a_val = 0;
 
-  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek)
+  if (bpi_found_mtk || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek || bpi_found_vs680)
     return;
 
   if(pwmmode==1)//sycle
@@ -3018,6 +3215,10 @@ struct BPIBoards bpiboard [] =
   { "bananapim4",  13101, BPI_MODEL_M4, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M4, physToGpio_BPI_M4, pinTobcm_BPI_M4, M4_I2C_DEV, M4_SPI_DEV, {M4_PWM_OFFSET,M4_I2C_OFFSET,M4_SPI_OFFSET} },
   { "bananapi-m4", 13101, BPI_MODEL_M4, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M4, physToGpio_BPI_M4, pinTobcm_BPI_M4, M4_I2C_DEV, M4_SPI_DEV, {M4_PWM_OFFSET,M4_I2C_OFFSET,M4_SPI_OFFSET} },
   { "banana-pi-m4", 13101, BPI_MODEL_M4, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M4, physToGpio_BPI_M4, pinTobcm_BPI_M4, M4_I2C_DEV, M4_SPI_DEV, {M4_PWM_OFFSET,M4_I2C_OFFSET,M4_SPI_OFFSET} },
+  { "bpi-m6",      13201, BPI_MODEL_M6, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M6, physToGpio_BPI_M6, pinTobcm_BPI_M6, M6_I2C_DEV, M6_SPI_DEV, {M6_PWM_OFFSET,M6_I2C_OFFSET,M6_SPI_OFFSET} },
+  { "bananapim6",  13201, BPI_MODEL_M6, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M6, physToGpio_BPI_M6, pinTobcm_BPI_M6, M6_I2C_DEV, M6_SPI_DEV, {M6_PWM_OFFSET,M6_I2C_OFFSET,M6_SPI_OFFSET} },
+  { "bananapi-m6", 13201, BPI_MODEL_M6, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M6, physToGpio_BPI_M6, pinTobcm_BPI_M6, M6_I2C_DEV, M6_SPI_DEV, {M6_PWM_OFFSET,M6_I2C_OFFSET,M6_SPI_OFFSET} },
+  { "banana-pi-m6", 13201, BPI_MODEL_M6, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_M6, physToGpio_BPI_M6, pinTobcm_BPI_M6, M6_I2C_DEV, M6_SPI_DEV, {M6_PWM_OFFSET,M6_I2C_OFFSET,M6_SPI_OFFSET} },
   { "bpi-r2",	   11101, BPI_MODEL_R2, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R2, physToGpio_BPI_R2, pinTobcm_BPI_R2, R2_I2C_DEV, R2_SPI_DEV, {R2_PWM_OFFSET,R2_I2C_OFFSET,R2_SPI_OFFSET} },
   { NULL,		0, 0, 1, 2, 5, 0, NULL, NULL, NULL, NULL, NULL, {-1, -1, -1} },
 } ;
@@ -3077,6 +3278,11 @@ static int bpi_model_is_realtek(int model)
 {
   return model == BPI_MODEL_W2 ||
       model == BPI_MODEL_M4;
+}
+
+static int bpi_model_is_vs680(int model)
+{
+  return model == BPI_MODEL_M6;
 }
 
 static void bpi_select_realtek_backend(int model)
@@ -3266,6 +3472,15 @@ static struct BPIBoards *bpi_find_board_by_model_string(const char *hardware)
       strstr(hardware, "rtd-1395-bananapi-m4"))
     return bpi_find_board_by_name("bpi-m4");
 
+  if (strstr(hardware, "Banana Pi BPI-M6") ||
+      strstr(hardware, "BananaPi BPI-M6") ||
+      strstr(hardware, "Banana Pi M6") ||
+      strstr(hardware, "BananaPi M6") ||
+      strstr(hardware, "BPI-M6") ||
+      strstr(hardware, "Synaptics VS680 EVK") ||
+      strstr(hardware, "vs680-a0-bananapi-m6"))
+    return bpi_find_board_by_name("bpi-m6");
+
   if (strstr(hardware, "Banana Pi BPI-M1 Super") ||
       strstr(hardware, "BananaPi BPI-M1 Super") ||
       strstr(hardware, "Banana Pi M1 Super") ||
@@ -3386,6 +3601,7 @@ int bpi_piGpioLayout (void)
   bpi_found_renesas = 0;
   bpi_found_rockchip = 0;
   bpi_found_realtek = 0;
+  bpi_found_vs680 = 0;
   if ((bpiFd = fopen("/var/lib/bananapi/board.sh", "r")) != NULL) {
     while(fgets(buffer, sizeof(buffer), bpiFd) != NULL) {
       if (sscanf(buffer, "BOARD=%1023s", hardware) != 1)
@@ -3450,6 +3666,7 @@ void bpi_piBoardId (int *model, int *rev, int *mem, int *maker, int *warranty)
     bpi_found_realtek = bpi_model_is_realtek(board->model);
     if (bpi_found_realtek)
       bpi_select_realtek_backend(board->model);
+    bpi_found_vs680 = bpi_model_is_vs680(board->model);
     //printf("BPI: name[%s] bType(%d) model(%d)\n",board->name, bType, board->model);
     *model    = bType ;
     *rev      = bRev ;
@@ -3595,6 +3812,36 @@ int bpi_wiringPiSetup (void)
         }
         close(fd);
         return wiringPiFailure (WPI_ALMOST,"wiringPiSetup: mmap (REALTEK GPIO) failed: %s\n", strerror (errno)) ;
+      }
+    }
+    close(fd);
+    initialiseEpoch () ;
+    return 0 ;
+  }
+
+  if (bpi_found_vs680)
+  {
+    int i;
+
+    for (i = 0; i < VS680_GPIO_BANKS; ++i)
+    {
+      vs680_gpio[i] = (uint32_t *)mmap(0, VS680_GPIO_MAP_SIZE,
+          PROT_READ|PROT_WRITE, MAP_SHARED, fd, vs680_gpio_base[i]);
+      if (vs680_gpio[i] == MAP_FAILED)
+      {
+        int j;
+
+        vs680_gpio[i] = NULL;
+        for (j = 0; j < i; ++j)
+        {
+          if (vs680_gpio[j] != NULL)
+          {
+            munmap((void *)vs680_gpio[j], VS680_GPIO_MAP_SIZE);
+            vs680_gpio[j] = NULL;
+          }
+        }
+        close(fd);
+        return wiringPiFailure (WPI_ALMOST,"wiringPiSetup: mmap (VS680 GPIO) failed: %s\n", strerror (errno)) ;
       }
     }
     close(fd);
