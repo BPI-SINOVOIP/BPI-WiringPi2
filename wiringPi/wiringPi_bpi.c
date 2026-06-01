@@ -116,6 +116,18 @@ int *pinTobcm_BP ;
 #define MAP_SIZE	          (4096*2)
 #define MAP_MASK	          (MAP_SIZE - 1)
 
+//mt7623 gpio
+#define MTK_GPIO_BASE_BP      (0x10005000)
+#define MTK_GPIO_DIR          (0x00)
+#define MTK_GPIO_PULLE        (0x150)
+#define MTK_GPIO_PULLSEL      (0x280)
+#define MTK_GPIO_DOUT         (0x500)
+#define MTK_GPIO_DIN          (0x630)
+#define MTK_GPIO_MODE         (0x760)
+#define MTK_GPIO_MAP_SIZE     (8 * 1024)
+#define MTK_GPIO_MODE_PINS_PER_REG   5
+#define MTK_GPIO_FIELD_PINS_PER_REG  16
+
 //sunxi_pwm, only use ch0
 #define SUNXI_PWM_BASE        (0x01c21400)
 #define SUNXI_PWM_CH0_CTRL    (SUNXI_PWM_BASE)
@@ -150,6 +162,8 @@ int *pinTobcm_BP ;
 #define GPIO_TIMER_BP		(0x0000B000)
 
 static int wiringPinMode = WPI_MODE_UNINITIALISED ;
+static int bpi_found_mtk = 0 ;
+static uint8_t *mtk_gpio_base = NULL ;
 
 
 static int syspin [64] =
@@ -905,6 +919,139 @@ void sunxi_pullUpDnControl (int pin, int pud)
   return ;
 }
 
+static volatile uint32_t *mtk_gpio_reg(unsigned int offset)
+{
+  return (volatile uint32_t *)(mtk_gpio_base + offset);
+}
+
+static int mtk_gpio_mapped(void)
+{
+  return mtk_gpio_base != NULL;
+}
+
+static unsigned int mtk_gpio_field_offset(unsigned int base, unsigned int pin)
+{
+  return base + (pin / MTK_GPIO_FIELD_PINS_PER_REG) * 0x10;
+}
+
+static unsigned int mtk_gpio_field_shift(unsigned int pin)
+{
+  return pin % MTK_GPIO_FIELD_PINS_PER_REG;
+}
+
+static unsigned int mtk_gpio_dir_offset(unsigned int pin, unsigned int *shift)
+{
+  if (pin <= 175)
+  {
+    *shift = pin % MTK_GPIO_FIELD_PINS_PER_REG;
+    return MTK_GPIO_DIR + (pin / MTK_GPIO_FIELD_PINS_PER_REG) * 0x10;
+  }
+
+  *shift = (pin - 176) % MTK_GPIO_FIELD_PINS_PER_REG;
+  return 0xc0 + ((pin - 176) / MTK_GPIO_FIELD_PINS_PER_REG) * 0x10;
+}
+
+static void mtk_gpio_update_bit(unsigned int offset, unsigned int shift, int value)
+{
+  uint32_t regval;
+  volatile uint32_t *reg;
+
+  if (!mtk_gpio_mapped())
+    return;
+
+  reg = mtk_gpio_reg(offset);
+  regval = *reg;
+  if (value)
+    regval |= (1u << shift);
+  else
+    regval &= ~(1u << shift);
+  *reg = regval;
+}
+
+static void mtk_set_pin_mode(int pin, int mode)
+{
+  uint32_t regval;
+  unsigned int shift;
+  volatile uint32_t *reg;
+
+  if (!mtk_gpio_mapped())
+    return;
+
+  reg = mtk_gpio_reg(MTK_GPIO_MODE + (pin / MTK_GPIO_MODE_PINS_PER_REG) * 0x10);
+  shift = (pin % MTK_GPIO_MODE_PINS_PER_REG) * 3;
+  regval = *reg;
+  regval &= ~(0x7u << shift);
+  regval |= ((mode & 0x7u) << shift);
+  *reg = regval;
+}
+
+static int mtk_get_pin_mode(int pin)
+{
+  uint32_t mode;
+  unsigned int offset;
+  unsigned int shift;
+
+  if (!mtk_gpio_mapped())
+    return 0;
+
+  offset = MTK_GPIO_MODE + (pin / MTK_GPIO_MODE_PINS_PER_REG) * 0x10;
+  shift = (pin % MTK_GPIO_MODE_PINS_PER_REG) * 3;
+  mode = (*mtk_gpio_reg(offset) >> shift) & 0x7u;
+  if (mode != 0)
+    return mode;
+
+  offset = mtk_gpio_dir_offset(pin, &shift);
+  return ((*mtk_gpio_reg(offset) >> shift) & 0x1u) ? OUTPUT : INPUT;
+}
+
+static void mtk_set_pin_direction(int pin, int mode)
+{
+  unsigned int offset;
+  unsigned int shift;
+
+  if (!mtk_gpio_mapped())
+    return;
+
+  offset = mtk_gpio_dir_offset(pin, &shift);
+  mtk_gpio_update_bit(offset, shift, mode == OUTPUT);
+}
+
+static int mtk_digitalRead(int pin)
+{
+  if (!mtk_gpio_mapped())
+    return LOW;
+
+  return ((*mtk_gpio_reg(mtk_gpio_field_offset(MTK_GPIO_DIN, pin)) >>
+           mtk_gpio_field_shift(pin)) & 0x1u) ? HIGH : LOW;
+}
+
+static void mtk_digitalWrite(int pin, int value)
+{
+  if (!mtk_gpio_mapped())
+    return;
+
+  mtk_gpio_update_bit(mtk_gpio_field_offset(MTK_GPIO_DOUT, pin),
+                      mtk_gpio_field_shift(pin), value == HIGH);
+}
+
+static void mtk_pullUpDnControl(int pin, int pud)
+{
+  unsigned int shift;
+
+  if (!mtk_gpio_mapped())
+    return;
+
+  shift = mtk_gpio_field_shift(pin);
+  if (pud == PUD_OFF)
+  {
+    mtk_gpio_update_bit(mtk_gpio_field_offset(MTK_GPIO_PULLE, pin), shift, 0);
+    return;
+  }
+
+  mtk_gpio_update_bit(mtk_gpio_field_offset(MTK_GPIO_PULLSEL, pin), shift, pud == PUD_UP);
+  mtk_gpio_update_bit(mtk_gpio_field_offset(MTK_GPIO_PULLE, pin), shift, 1);
+}
+
 #ifdef BPI
 
 int bpi_getAlt (int pin)
@@ -926,6 +1073,9 @@ int bpi_getAlt (int pin)
       printf("[%s:L%d] the pin:%d is invaild,please check it over!\n", __func__,  __LINE__, pin);
     return -1;
   }
+  if (bpi_found_mtk)
+    return mtk_get_pin_mode(pin);
+
   alt=sunxi_get_pin_mode(pin);
   return alt ;
 }
@@ -933,6 +1083,9 @@ int bpi_getAlt (int pin)
 
 void bpi_pwmSetMode (int mode)
 {
+  if (bpi_found_mtk)
+    return;
+
   sunxi_pwm_set_mode(mode);
   sunxi_pwm_set_enable(1);
   return;
@@ -940,6 +1093,9 @@ void bpi_pwmSetMode (int mode)
 
 void bpi_pwmSetRange (unsigned int range)
 {
+  if (bpi_found_mtk)
+    return;
+
   sunxi_pwm_set_period(range);
   return;
 }
@@ -947,6 +1103,9 @@ void bpi_pwmSetRange (unsigned int range)
 
 void bpi_pwmSetClock (int divisor)
 {
+  if (bpi_found_mtk)
+    return;
+
   sunxi_pwm_set_clk(divisor);
   sunxi_pwm_set_enable(1);
   return;
@@ -1014,6 +1173,11 @@ void bpi_pinModeAlt (int pin, int mode)
       printf ("%s,%d,pin:%d,mode:%d\n", __func__, __LINE__,pin,mode) ;
     softPwmStop (origPin) ;
     softToneStop (origPin) ;
+    if (bpi_found_mtk)
+    {
+      mtk_set_pin_mode(pin, mode);
+      return;
+    }
     sunxi_set_pin_alt(pin,mode);
   }
 }
@@ -1043,6 +1207,34 @@ void bpi_pinMode (int pin, int mode)
       printf ("%s,%d,pin:%d,mode:%d\n", __func__, __LINE__,pin,mode) ;
     softPwmStop (origPin) ;
     softToneStop (origPin) ;
+
+    if (bpi_found_mtk)
+    {
+      if (mode == INPUT || mode == OUTPUT)
+      {
+        mtk_set_pin_mode(pin, 0);
+        mtk_set_pin_direction(pin, mode);
+      }
+      else if (mode == PULLUP)
+      {
+        mtk_pullUpDnControl(pin, PUD_UP);
+      }
+      else if (mode == PULLDOWN)
+      {
+        mtk_pullUpDnControl(pin, PUD_DOWN);
+      }
+      else if (mode == PULLOFF)
+      {
+        mtk_pullUpDnControl(pin, PUD_OFF);
+      }
+      else
+      {
+        return;
+      }
+      wiringPinMode = mode;
+      return;
+    }
+
     if (mode == INPUT)
     {
       sunxi_set_pin_mode(pin,INPUT);
@@ -1133,6 +1325,11 @@ void bpi_pullUpDnControl (int pin, int pud)
       return;
     }
     pud &= 3 ;
+    if (bpi_found_mtk)
+    {
+      mtk_pullUpDnControl(pin, pud);
+      return;
+    }
     sunxi_pullUpDnControl(pin, pud);
     return;
   }
@@ -1191,6 +1388,9 @@ int bpi_digitalRead (int pin)
         printf("[%s:L%d] the pin:%d is invaild,please check it over!\n", __func__,  __LINE__, pin);
       return LOW;
     }
+    if (bpi_found_mtk)
+      return mtk_digitalRead(pin);
+
     return sunxi_digitalRead(pin);
   }
   else
@@ -1246,6 +1446,11 @@ void bpi_digitalWrite (int pin, int value)
       printf("%d %s,%d %d invalid pin,please check it over.\n",pin,__func__, __LINE__,wiringPiMode);
       return ;
     }
+    if (bpi_found_mtk)
+    {
+      mtk_digitalWrite(pin, value);
+      return;
+    }
     sunxi_digitalWrite(pin, value); 
   }
   else
@@ -1261,6 +1466,9 @@ void bpi_pwmWrite (int pin, int value)
   struct wiringPiNodeStruct *node = wiringPiNodes ;
 
   uint32_t a_val = 0;
+
+  if (bpi_found_mtk)
+    return;
 
   if(pwmmode==1)//sycle
   {
@@ -1402,6 +1610,7 @@ int bpi_piGpioLayout (void)
     return gpioLayout ;
 
   bpi_found = 0; // -1: not init, 0: init but not found, 1: found
+  bpi_found_mtk = 0;
   if ((bpiFd = fopen("/var/lib/bananapi/board.sh", "r")) == NULL) {
     return -1;
   }
@@ -1457,6 +1666,7 @@ void bpi_piBoardId (int *model, int *rev, int *mem, int *maker, int *warranty)
     pinToGpio_BP =  board->pinToGpio ;
     physToGpio_BP = board->physToGpio ;
     pinTobcm_BP = board->pinTobcm ;
+    bpi_found_mtk = (board->model == BPI_MODEL_R2);
     //printf("BPI: name[%s] bType(%d) model(%d)\n",board->name, bType, board->model);
     *model    = bType ;
     *rev      = bRev ;
@@ -1489,6 +1699,19 @@ int bpi_wiringPiSetup (void)
   // Open the master /dev/memory device
   if ((fd = open ("/dev/mem", O_RDWR | O_SYNC | O_CLOEXEC) ) < 0)
     return wiringPiFailure (WPI_ALMOST, "wiringPiSetup: Unable to open /dev/mem: %s\n", strerror (errno)) ;
+
+  if (bpi_found_mtk)
+  {
+    mtk_gpio_base = (uint8_t *)mmap(0, MTK_GPIO_MAP_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, MTK_GPIO_BASE_BP);
+    close(fd);
+    if (mtk_gpio_base == MAP_FAILED)
+    {
+      mtk_gpio_base = NULL;
+      return wiringPiFailure (WPI_ALMOST,"wiringPiSetup: mmap (MTK GPIO) failed: %s\n", strerror (errno)) ;
+    }
+    initialiseEpoch () ;
+    return 0 ;
+  }
 
   gpio_lm = (uint32_t *)mmap(0, BLOCK_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, GPIO_BASE_LM_BP);
 
