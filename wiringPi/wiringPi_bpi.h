@@ -52,6 +52,7 @@
 #define BPI_MODEL_M4ZERO     80
 #define BPI_MODEL_M2S        81
 #define BPI_MODEL_CM4IO      82
+#define BPI_MODEL_M5         83
 #define BPI_MODELS_MAX       84
 
 #define BPI_MAKER_SINOVOIP    6
