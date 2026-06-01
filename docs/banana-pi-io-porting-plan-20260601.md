@@ -139,11 +139,10 @@ The supported IO surface is:
 
 ## Current Next Item
 
-Continue Batch B from `BPI-M2S`.
+Continue Batch B from `BPI-CM4IO`.
 
 Resume sequence:
 
-1. Finish `BPI-M2S` in this repo, build-test, commit, and push.
-2. Finish `BPI-M2S` in `RPi.GPIO`, build-test, commit, and push.
-3. Repeat the same two-repo flow for `BPI-CM4IO`.
-4. Continue with `BPI-M5` and `BPI-M2 Pro` after confirming the SM1 maps.
+1. Finish `BPI-CM4IO` in this repo, build-test, commit, and push.
+2. Finish `BPI-CM4IO` in `RPi.GPIO`, build-test, commit, and push.
+3. Continue with `BPI-M5` and `BPI-M2 Pro` after confirming the SM1 maps.
