@@ -421,6 +421,7 @@ const char *piModelNames [PI_MODELS_MAX] =
   [BPI_MODEL_SM10]    = "Banana Pi SM10[SpacemiT K3]",
   [BPI_MODEL_K230D_ZERO] = "Banana Pi CanMV-K230D-Zero[Kendryte K230D]",
   [BPI_MODEL_OPENWRT_ONE] = "OpenWrt One[MT7981B]",
+  [BPI_MODEL_K3_PICO_ITX] = "K3 Pico-ITX[SpacemiT K3]",
 #endif
 } ;
 

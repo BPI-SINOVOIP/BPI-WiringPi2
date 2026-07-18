@@ -81,7 +81,8 @@
 #define BPI_MODEL_SM10       109
 #define BPI_MODEL_K230D_ZERO 110
 #define BPI_MODEL_OPENWRT_ONE 111
-#define BPI_MODELS_MAX       112
+#define BPI_MODEL_K3_PICO_ITX 112
+#define BPI_MODELS_MAX       113
 
 #define BPI_MAKER_SINOVOIP    6
 

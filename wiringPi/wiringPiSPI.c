@@ -169,8 +169,11 @@ int wiringPiSPIxSetupMode(const int number, const int channel, const int speed, 
   const char *device;
   
   rev = piGpioLayout();
-  if ((rev >= BPI_MODEL_MIN) && (bpi_wiringPiSetupSPI(rev, &device) == 0))
+  if (rev >= BPI_MODEL_MIN) {
+    if (bpi_wiringPiSetupSPI(rev, &device) != 0)
+      return wiringPiFailure (WPI_ALMOST, "SPI is not mapped for Banana Pi model %d\n", rev) ;
     snprintf (spiDev, 31, "%s", device) ;
+  }
   else
     snprintf (spiDev, 31, "/dev/spidev%d.%d", number, channel) ;
 #else

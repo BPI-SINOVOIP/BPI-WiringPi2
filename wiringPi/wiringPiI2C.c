@@ -261,8 +261,12 @@ int wiringPiI2CSetup (const int devId)
   rev = piGpioLayout () ;
 
 #ifdef BPI
-  if ((rev >= BPI_MODEL_MIN) && (bpi_wiringPiSetupI2C(rev, &device) == 0))
+  if (rev >= BPI_MODEL_MIN)
+  {
+    if (bpi_wiringPiSetupI2C(rev, &device) != 0)
+      return wiringPiFailure (WPI_ALMOST, "I2C is not mapped for Banana Pi model %d\n", rev) ;
     return wiringPiI2CSetupInterface (device, devId) ;
+  }
 #else
   if (rev == 1)
     device = "/dev/i2c-0" ;

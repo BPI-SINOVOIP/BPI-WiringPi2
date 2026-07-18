@@ -4354,6 +4354,10 @@ struct BPIBoards bpiboard [] =
   { "openwrt-one", 14401, BPI_MODEL_OPENWRT_ONE, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_OPENWRT_ONE, physToGpio_OPENWRT_ONE, pinTobcm_OPENWRT_ONE, OPENWRT_ONE_I2C_DEV, OPENWRT_ONE_SPI_DEV, {OPENWRT_ONE_PWM_OFFSET,OPENWRT_ONE_I2C_OFFSET,OPENWRT_ONE_SPI_OFFSET} },
   { "openwrt,one", 14401, BPI_MODEL_OPENWRT_ONE, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_OPENWRT_ONE, physToGpio_OPENWRT_ONE, pinTobcm_OPENWRT_ONE, OPENWRT_ONE_I2C_DEV, OPENWRT_ONE_SPI_DEV, {OPENWRT_ONE_PWM_OFFSET,OPENWRT_ONE_I2C_OFFSET,OPENWRT_ONE_SPI_OFFSET} },
   { "ap-24.xy",   14401, BPI_MODEL_OPENWRT_ONE, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_OPENWRT_ONE, physToGpio_OPENWRT_ONE, pinTobcm_OPENWRT_ONE, OPENWRT_ONE_I2C_DEV, OPENWRT_ONE_SPI_DEV, {OPENWRT_ONE_PWM_OFFSET,OPENWRT_ONE_I2C_OFFSET,OPENWRT_ONE_SPI_OFFSET} },
+  { "k3-pico-itx",          14501, BPI_MODEL_K3_PICO_ITX, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_K3_PICO_ITX, physToGpio_K3_PICO_ITX, pinTobcm_K3_PICO_ITX, K3_PICO_ITX_I2C_DEV, K3_PICO_ITX_SPI_DEV, {K3_PICO_ITX_PWM_OFFSET,K3_PICO_ITX_I2C_OFFSET,K3_PICO_ITX_SPI_OFFSET} },
+  { "spacemit-k3-pico-itx", 14501, BPI_MODEL_K3_PICO_ITX, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_K3_PICO_ITX, physToGpio_K3_PICO_ITX, pinTobcm_K3_PICO_ITX, K3_PICO_ITX_I2C_DEV, K3_PICO_ITX_SPI_DEV, {K3_PICO_ITX_PWM_OFFSET,K3_PICO_ITX_I2C_OFFSET,K3_PICO_ITX_SPI_OFFSET} },
+  { "spacemit,k3-pico-itx", 14501, BPI_MODEL_K3_PICO_ITX, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_K3_PICO_ITX, physToGpio_K3_PICO_ITX, pinTobcm_K3_PICO_ITX, K3_PICO_ITX_I2C_DEV, K3_PICO_ITX_SPI_DEV, {K3_PICO_ITX_PWM_OFFSET,K3_PICO_ITX_I2C_OFFSET,K3_PICO_ITX_SPI_OFFSET} },
+  { "spacemit-k3-pico",     14501, BPI_MODEL_K3_PICO_ITX, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_K3_PICO_ITX, physToGpio_K3_PICO_ITX, pinTobcm_K3_PICO_ITX, K3_PICO_ITX_I2C_DEV, K3_PICO_ITX_SPI_DEV, {K3_PICO_ITX_PWM_OFFSET,K3_PICO_ITX_I2C_OFFSET,K3_PICO_ITX_SPI_OFFSET} },
   { "bpi-r4",      13601, BPI_MODEL_R4, 1, 4, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R4, physToGpio_BPI_R4, pinTobcm_BPI_R4, R4_I2C_DEV, R4_SPI_DEV, {R4_PWM_OFFSET,R4_I2C_OFFSET,R4_SPI_OFFSET} },
   { "bananapir4",  13601, BPI_MODEL_R4, 1, 4, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R4, physToGpio_BPI_R4, pinTobcm_BPI_R4, R4_I2C_DEV, R4_SPI_DEV, {R4_PWM_OFFSET,R4_I2C_OFFSET,R4_SPI_OFFSET} },
   { "bananapi-r4", 13601, BPI_MODEL_R4, 1, 4, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R4, physToGpio_BPI_R4, pinTobcm_BPI_R4, R4_I2C_DEV, R4_SPI_DEV, {R4_PWM_OFFSET,R4_I2C_OFFSET,R4_SPI_OFFSET} },
@@ -4694,6 +4698,13 @@ static struct BPIBoards *bpi_find_board_by_model_string(const char *hardware)
       strstr(hardware, "bananapi-canmv-k230d-zero"))
     return bpi_find_board_by_name("bpi-canmv-k230d-zero");
 
+  if (strstr(hardware, "SpacemiT K3 Pico ITX") ||
+      strstr(hardware, "Spacemit K3 Pico ITX") ||
+      strstr(hardware, "spacemit k3 pico itx") ||
+      strstr(hardware, "spacemit,k3-pico-itx") ||
+      strstr(hardware, "k3-pico-itx"))
+    return bpi_find_board_by_name("k3-pico-itx");
+
   if (strstr(hardware, "OpenWrt One") ||
       strstr(hardware, "OpenWRT One") ||
       strstr(hardware, "openwrt,one") ||
@@ -4995,8 +5006,10 @@ void bpi_piBoardId (int *model, int *rev, int *mem, int *maker, int *warranty)
                        board->model == BPI_MODEL_M2PRO);
     bpi_found_spacemit = (board->model == BPI_MODEL_F3 ||
                            board->model == BPI_MODEL_CM6 ||
-                           board->model == BPI_MODEL_SM10);
-    spacemit_is_k3 = (board->model == BPI_MODEL_SM10);
+                           board->model == BPI_MODEL_SM10 ||
+                           board->model == BPI_MODEL_K3_PICO_ITX);
+    spacemit_is_k3 = (board->model == BPI_MODEL_SM10 ||
+                      board->model == BPI_MODEL_K3_PICO_ITX);
     bpi_found_renesas = (board->model == BPI_MODEL_AI2N);
     bpi_found_rockchip = bpi_model_is_rockchip(board->model);
     if (bpi_found_rockchip)
@@ -5364,8 +5377,11 @@ int bpi_wiringPiSetupI2C (int board_model, const char **device)
 
   for (board = bpiboard ; board->name != NULL ; ++board) {
     if (board->model == board_model) {
-      *device = board->i2c_dev; 
-      return 0;
+      if (board->i2c_dev != NULL) {
+        *device = board->i2c_dev;
+        return 0;
+      }
+      return -1;
     }
   }
 
@@ -5378,8 +5394,11 @@ int bpi_wiringPiSetupSPI (int board_model, const char **device)
 
 	for (board = bpiboard ; board->name != NULL ; ++board) {
       if (board->model == board_model) {
-        *device = board->spi_dev; 
-	return 0;
+        if (board->spi_dev != NULL) {
+          *device = board->spi_dev;
+	  return 0;
+        }
+	return -1;
       }
     }
 
