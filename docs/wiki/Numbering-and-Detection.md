@@ -12,6 +12,8 @@ BPI-WiringPi2 may expose three different identifiers for one connector pin:
 
 Internally, the backend must also know the native SoC GPIO bank/line or Linux gpiochip offset. Do not mix this controller identifier with the public BCM-style number.
 
+BPI-F4 is a documented exception to the usual single-header layout: physical numbers 1-29 are rows in the official combined terminal table across CN8/CN3/CN7/CN6/CN5/CN1/CN4. They are not connector-local pin labels. WiringPi and BCM-style channels 0-19 follow the GPIO-bearing table rows in order and map to native SP7350 lines `84,85,71,70,81,80,83,82,60,61,69,68,72,73,74,75,59,58,56,57`.
+
 ## Board detection
 
 Detection aliases are maintained in `wiringPi/wiringPi_bpi.c`; effective Banana Pi model IDs are declared in `wiringPi/wiringPi_bpi.h`. The implementation may inspect Device Tree model/compatible strings and legacy CPU information, depending on the platform.

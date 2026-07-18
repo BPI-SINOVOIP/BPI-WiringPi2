@@ -77,7 +77,8 @@
 #define BPI_MODEL_R64        105
 #define BPI_MODEL_R4LITE     106
 #define BPI_MODEL_R4PRO      107
-#define BPI_MODELS_MAX       108
+#define BPI_MODEL_F4         108
+#define BPI_MODELS_MAX       109
 
 #define BPI_MAKER_SINOVOIP    6
 

@@ -313,6 +313,23 @@ int *pinTobcm_BP ;
 #define SP7021_R32_ROF(r)              (((r) >> 5) << 2)
 #define SP7021_R32_BOF(r)              ((r) & 0x1f)
 
+// Sunplus SP7350 GPIO (BPI-F4)
+#define SP7350_GPIO_PIN_BASE           0
+#define SP7350_GPIO_PIN_END            105
+#define SP7350_GPIO_MAP_SIZE           0x1000
+#define SP7350_GPIO_PAGE_BASE          0xF8803000
+#define SP7350_GPIO_FIRST_OFFSET       0x2e4
+#define SP7350_GPIO_GPIOXT_OFFSET      0x380
+#define SP7350_GPIO_FIRST              0x00
+#define SP7350_GPIO_CTL                0x00
+#define SP7350_GPIO_OE                 0x34
+#define SP7350_GPIO_OUT                0x68
+#define SP7350_GPIO_IN                 0x9c
+#define SP7350_R16_ROF(r)              (((r) >> 4) << 2)
+#define SP7350_R16_BOF(r)              ((r) & 0x0f)
+#define SP7350_R32_ROF(r)              (((r) >> 5) << 2)
+#define SP7350_R32_BOF(r)              ((r) & 0x1f)
+
 struct realtek_gpio_group
 {
   int pin_base;
@@ -431,6 +448,7 @@ static int bpi_found_rockchip = 0 ;
 static int bpi_found_realtek = 0 ;
 static int bpi_found_vs680 = 0 ;
 static int bpi_found_sp7021 = 0 ;
+static int bpi_found_sp7350 = 0 ;
 static uint8_t *mtk_gpio_base = NULL ;
 static uint8_t *mtk_v2_gpio_base = NULL ;
 static uint8_t *mtk_mt7622_gpio_base = NULL ;
@@ -447,6 +465,9 @@ static volatile uint32_t *sp7021_gpio_page2 = NULL ;
 static volatile uint32_t *sp7021_gpio_base0 = NULL ;
 static volatile uint32_t *sp7021_gpio_base1 = NULL ;
 static volatile uint32_t *sp7021_gpio_base2 = NULL ;
+static volatile uint32_t *sp7350_gpio_page = NULL ;
+static volatile uint32_t *sp7350_gpio_first = NULL ;
+static volatile uint32_t *sp7350_gpio_gpioxt = NULL ;
 static const off_t rockchip_gpio_base_rk3308[ROCKCHIP_GPIO_BANKS] = {
   0xff220000,
   0xff230000,
@@ -2800,6 +2821,139 @@ static void sp7021_digitalWrite(int pin, int value)
   sp7021_update_masked(sp7021_gpio_base0, offset, bit, value != LOW);
 }
 
+static int sp7350_gpio_mapped(void)
+{
+  return sp7350_gpio_first != NULL && sp7350_gpio_gpioxt != NULL;
+}
+
+static int sp7350_is_pin(int pin)
+{
+  return pin >= SP7350_GPIO_PIN_BASE && pin <= SP7350_GPIO_PIN_END;
+}
+
+static volatile uint32_t *sp7350_reg(volatile uint32_t *base, unsigned int offset)
+{
+  return base + (offset >> 2);
+}
+
+static void sp7350_update_masked(volatile uint32_t *base, unsigned int offset,
+                                 unsigned int bit, int value)
+{
+  uint32_t data;
+
+  if (!sp7350_gpio_mapped())
+    return;
+
+  data = 1u << (bit + 16);
+  if (value)
+    data |= 1u << bit;
+  *sp7350_reg(base, offset) = data;
+}
+
+static void sp7350_update_direct(volatile uint32_t *base, unsigned int offset,
+                                 unsigned int bit, int value)
+{
+  volatile uint32_t *reg;
+  uint32_t data;
+
+  if (!sp7350_gpio_mapped())
+    return;
+
+  reg = sp7350_reg(base, offset);
+  data = *reg;
+  if (value)
+    data |= 1u << bit;
+  else
+    data &= ~(1u << bit);
+  *reg = data;
+}
+
+static void sp7350_claim_gpio(int pin)
+{
+  unsigned int bit16, bit32;
+
+  if (!sp7350_is_pin(pin) || !sp7350_gpio_mapped())
+    return;
+
+  bit16 = SP7350_R16_BOF(pin);
+  bit32 = SP7350_R32_BOF(pin);
+  sp7350_update_direct(sp7350_gpio_first,
+                       SP7350_GPIO_FIRST + SP7350_R32_ROF(pin), bit32, 1);
+  sp7350_update_masked(sp7350_gpio_gpioxt,
+                       SP7350_GPIO_CTL + SP7350_R16_ROF(pin), bit16, 1);
+}
+
+static void sp7350_set_pin_alt(int pin, int mode)
+{
+  (void)mode;
+
+  if (!sp7350_is_pin(pin))
+    return;
+
+  sp7350_claim_gpio(pin);
+}
+
+static void sp7350_set_pin_mode(int pin, int mode)
+{
+  unsigned int bit;
+
+  if (!sp7350_is_pin(pin) || !sp7350_gpio_mapped())
+    return;
+  if (mode != INPUT && mode != OUTPUT)
+    return;
+
+  sp7350_claim_gpio(pin);
+  bit = SP7350_R16_BOF(pin);
+  sp7350_update_masked(sp7350_gpio_gpioxt,
+                       SP7350_GPIO_OE + SP7350_R16_ROF(pin),
+                       bit, mode == OUTPUT);
+}
+
+static int sp7350_get_pin_mode(int pin)
+{
+  unsigned int bit, offset;
+  uint32_t data;
+
+  if (!sp7350_is_pin(pin) || !sp7350_gpio_mapped())
+    return INPUT;
+
+  bit = SP7350_R16_BOF(pin);
+  offset = SP7350_GPIO_OE + SP7350_R16_ROF(pin);
+  data = *sp7350_reg(sp7350_gpio_gpioxt, offset);
+  return (data & (1u << bit)) ? OUTPUT : INPUT;
+}
+
+/* Pull configuration is intentionally deferred until F4 pad state is tested. */
+static void sp7350_pullUpDnControl(int pin, int pud)
+{
+  (void)pin;
+  (void)pud;
+}
+
+static int sp7350_digitalRead(int pin)
+{
+  unsigned int bit, offset;
+
+  if (!sp7350_is_pin(pin) || !sp7350_gpio_mapped())
+    return LOW;
+
+  bit = SP7350_R32_BOF(pin);
+  offset = SP7350_GPIO_IN + SP7350_R32_ROF(pin);
+  return (*sp7350_reg(sp7350_gpio_gpioxt, offset) & (1u << bit)) ? HIGH : LOW;
+}
+
+static void sp7350_digitalWrite(int pin, int value)
+{
+  unsigned int bit, offset;
+
+  if (!sp7350_is_pin(pin) || !sp7350_gpio_mapped())
+    return;
+
+  bit = SP7350_R16_BOF(pin);
+  offset = SP7350_GPIO_OUT + SP7350_R16_ROF(pin);
+  sp7350_update_masked(sp7350_gpio_gpioxt, offset, bit, value != LOW);
+}
+
 #ifdef BPI
 
 int bpi_getAlt (int pin)
@@ -2841,6 +2995,8 @@ int bpi_getAlt (int pin)
     return vs680_get_pin_mode(pin);
   if (bpi_found_sp7021)
     return sp7021_get_pin_mode(pin);
+  if (bpi_found_sp7350)
+    return sp7350_get_pin_mode(pin);
 
   alt=sunxi_get_pin_mode(pin);
   return alt ;
@@ -2849,7 +3005,7 @@ int bpi_getAlt (int pin)
 
 void bpi_pwmSetMode (int mode)
 {
-  if (bpi_found_mtk || bpi_found_mtk_v2 || bpi_found_mtk_mt7622 || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek || bpi_found_vs680 || bpi_found_sp7021)
+  if (bpi_found_mtk || bpi_found_mtk_v2 || bpi_found_mtk_mt7622 || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek || bpi_found_vs680 || bpi_found_sp7021 || bpi_found_sp7350)
     return;
 
   sunxi_pwm_set_mode(mode);
@@ -2859,7 +3015,7 @@ void bpi_pwmSetMode (int mode)
 
 void bpi_pwmSetRange (unsigned int range)
 {
-  if (bpi_found_mtk || bpi_found_mtk_v2 || bpi_found_mtk_mt7622 || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek || bpi_found_vs680 || bpi_found_sp7021)
+  if (bpi_found_mtk || bpi_found_mtk_v2 || bpi_found_mtk_mt7622 || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek || bpi_found_vs680 || bpi_found_sp7021 || bpi_found_sp7350)
     return;
 
   sunxi_pwm_set_period(range);
@@ -2869,7 +3025,7 @@ void bpi_pwmSetRange (unsigned int range)
 
 void bpi_pwmSetClock (int divisor)
 {
-  if (bpi_found_mtk || bpi_found_mtk_v2 || bpi_found_mtk_mt7622 || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek || bpi_found_vs680 || bpi_found_sp7021)
+  if (bpi_found_mtk || bpi_found_mtk_v2 || bpi_found_mtk_mt7622 || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek || bpi_found_vs680 || bpi_found_sp7021 || bpi_found_sp7350)
     return;
 
   sunxi_pwm_set_clk(divisor);
@@ -2987,6 +3143,11 @@ void bpi_pinModeAlt (int pin, int mode)
     if (bpi_found_sp7021)
     {
       sp7021_set_pin_alt(pin, mode);
+      return;
+    }
+    if (bpi_found_sp7350)
+    {
+      sp7350_set_pin_alt(pin, mode);
       return;
     }
     sunxi_set_pin_alt(pin,mode);
@@ -3266,6 +3427,32 @@ void bpi_pinMode (int pin, int mode)
       return;
     }
 
+    if (bpi_found_sp7350)
+    {
+      if (mode == INPUT || mode == OUTPUT)
+      {
+        sp7350_set_pin_mode(pin, mode);
+      }
+      else if (mode == PULLUP)
+      {
+        sp7350_pullUpDnControl(pin, PUD_UP);
+      }
+      else if (mode == PULLDOWN)
+      {
+        sp7350_pullUpDnControl(pin, PUD_DOWN);
+      }
+      else if (mode == PULLOFF)
+      {
+        sp7350_pullUpDnControl(pin, PUD_OFF);
+      }
+      else
+      {
+        return;
+      }
+      wiringPinMode = mode;
+      return;
+    }
+
     if (mode == INPUT)
     {
       sunxi_set_pin_mode(pin,INPUT);
@@ -3406,6 +3593,11 @@ void bpi_pullUpDnControl (int pin, int pud)
       sp7021_pullUpDnControl(pin, pud);
       return;
     }
+    if (bpi_found_sp7350)
+    {
+      sp7350_pullUpDnControl(pin, pud);
+      return;
+    }
     sunxi_pullUpDnControl(pin, pud);
     return;
   }
@@ -3484,6 +3676,8 @@ int bpi_digitalRead (int pin)
       return vs680_digitalRead(pin);
     if (bpi_found_sp7021)
       return sp7021_digitalRead(pin);
+    if (bpi_found_sp7350)
+      return sp7350_digitalRead(pin);
 
     return sunxi_digitalRead(pin);
   }
@@ -3590,6 +3784,11 @@ void bpi_digitalWrite (int pin, int value)
       sp7021_digitalWrite(pin, value);
       return;
     }
+    if (bpi_found_sp7350)
+    {
+      sp7350_digitalWrite(pin, value);
+      return;
+    }
     sunxi_digitalWrite(pin, value); 
   }
   else
@@ -3606,7 +3805,7 @@ void bpi_pwmWrite (int pin, int value)
 
   uint32_t a_val = 0;
 
-  if (bpi_found_mtk || bpi_found_mtk_v2 || bpi_found_mtk_mt7622 || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek || bpi_found_vs680 || bpi_found_sp7021)
+  if (bpi_found_mtk || bpi_found_mtk_v2 || bpi_found_mtk_mt7622 || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek || bpi_found_vs680 || bpi_found_sp7021 || bpi_found_sp7350)
     return;
 
   if(pwmmode==1)//sycle
@@ -3889,6 +4088,10 @@ struct BPIBoards bpiboard [] =
   { "bananapif2p", 13401, BPI_MODEL_F2P, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_F2S_F2P, physToGpio_BPI_F2S_F2P, pinTobcm_BPI_F2S_F2P, F2S_F2P_I2C_DEV, F2S_F2P_SPI_DEV, {F2S_F2P_PWM_OFFSET,F2S_F2P_I2C_OFFSET,F2S_F2P_SPI_OFFSET} },
   { "bananapi-f2p", 13401, BPI_MODEL_F2P, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_F2S_F2P, physToGpio_BPI_F2S_F2P, pinTobcm_BPI_F2S_F2P, F2S_F2P_I2C_DEV, F2S_F2P_SPI_DEV, {F2S_F2P_PWM_OFFSET,F2S_F2P_I2C_OFFSET,F2S_F2P_SPI_OFFSET} },
   { "banana-pi-f2p", 13401, BPI_MODEL_F2P, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_F2S_F2P, physToGpio_BPI_F2S_F2P, pinTobcm_BPI_F2S_F2P, F2S_F2P_I2C_DEV, F2S_F2P_SPI_DEV, {F2S_F2P_PWM_OFFSET,F2S_F2P_I2C_OFFSET,F2S_F2P_SPI_OFFSET} },
+  { "bpi-f4",      14101, BPI_MODEL_F4, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_F4, physToGpio_BPI_F4, pinTobcm_BPI_F4, F4_I2C_DEV, F4_SPI_DEV, {F4_PWM_OFFSET,F4_I2C_OFFSET,F4_SPI_OFFSET} },
+  { "bananapif4",  14101, BPI_MODEL_F4, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_F4, physToGpio_BPI_F4, pinTobcm_BPI_F4, F4_I2C_DEV, F4_SPI_DEV, {F4_PWM_OFFSET,F4_I2C_OFFSET,F4_SPI_OFFSET} },
+  { "bananapi-f4", 14101, BPI_MODEL_F4, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_F4, physToGpio_BPI_F4, pinTobcm_BPI_F4, F4_I2C_DEV, F4_SPI_DEV, {F4_PWM_OFFSET,F4_I2C_OFFSET,F4_SPI_OFFSET} },
+  { "banana-pi-f4", 14101, BPI_MODEL_F4, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_F4, physToGpio_BPI_F4, pinTobcm_BPI_F4, F4_I2C_DEV, F4_SPI_DEV, {F4_PWM_OFFSET,F4_I2C_OFFSET,F4_SPI_OFFSET} },
   { "bpi-r4",      13601, BPI_MODEL_R4, 1, 4, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R4, physToGpio_BPI_R4, pinTobcm_BPI_R4, R4_I2C_DEV, R4_SPI_DEV, {R4_PWM_OFFSET,R4_I2C_OFFSET,R4_SPI_OFFSET} },
   { "bananapir4",  13601, BPI_MODEL_R4, 1, 4, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R4, physToGpio_BPI_R4, pinTobcm_BPI_R4, R4_I2C_DEV, R4_SPI_DEV, {R4_PWM_OFFSET,R4_I2C_OFFSET,R4_SPI_OFFSET} },
   { "bananapi-r4", 13601, BPI_MODEL_R4, 1, 4, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R4, physToGpio_BPI_R4, pinTobcm_BPI_R4, R4_I2C_DEV, R4_SPI_DEV, {R4_PWM_OFFSET,R4_I2C_OFFSET,R4_SPI_OFFSET} },
@@ -4201,6 +4404,15 @@ static struct BPIBoards *bpi_find_board_by_model_string(const char *hardware)
       strstr(hardware, "sp7021-bpi-f2p"))
     return bpi_find_board_by_name("bpi-f2p");
 
+  if (strstr(hardware, "Banana Pi BPI-F4") ||
+      strstr(hardware, "BananaPi BPI-F4") ||
+      strstr(hardware, "Banana Pi F4") ||
+      strstr(hardware, "BananaPi F4") ||
+      strstr(hardware, "BPI-F4") ||
+      strstr(hardware, "bananapi,bpi-f4") ||
+      strstr(hardware, "sp7350-bpi-f4"))
+    return bpi_find_board_by_name("bpi-f4");
+
   if (strstr(hardware, "Banana Pi BPI-M1 Super") ||
       strstr(hardware, "BananaPi BPI-M1 Super") ||
       strstr(hardware, "Banana Pi M1 Super") ||
@@ -4424,6 +4636,7 @@ int bpi_piGpioLayout (void)
   bpi_found_realtek = 0;
   bpi_found_vs680 = 0;
   bpi_found_sp7021 = 0;
+  bpi_found_sp7350 = 0;
   if ((bpiFd = fopen("/var/lib/bananapi/board.sh", "r")) != NULL) {
     while(fgets(buffer, sizeof(buffer), bpiFd) != NULL) {
       if (sscanf(buffer, "BOARD=%1023s", hardware) != 1)
@@ -4498,6 +4711,7 @@ void bpi_piBoardId (int *model, int *rev, int *mem, int *maker, int *warranty)
       bpi_select_realtek_backend(board->model);
     bpi_found_vs680 = bpi_model_is_vs680(board->model);
     bpi_found_sp7021 = bpi_model_is_sp7021(board->model);
+    bpi_found_sp7350 = (board->model == BPI_MODEL_F4);
     //printf("BPI: name[%s] bType(%d) model(%d)\n",board->name, bType, board->model);
     *model    = bType ;
     *rev      = bRev ;
@@ -4731,6 +4945,24 @@ int bpi_wiringPiSetup (void)
     sp7021_gpio_base0 = sp7021_gpio_page0 + (SP7021_GPIO_BASE0_OFFSET >> 2);
     sp7021_gpio_base1 = sp7021_gpio_page0 + (SP7021_GPIO_BASE1_OFFSET >> 2);
     sp7021_gpio_base2 = sp7021_gpio_page2 + (SP7021_GPIO_BASE2_OFFSET >> 2);
+    close(fd);
+    initialiseEpoch () ;
+    return 0 ;
+  }
+
+  if (bpi_found_sp7350)
+  {
+    sp7350_gpio_page = (uint32_t *)mmap(0, SP7350_GPIO_MAP_SIZE,
+        PROT_READ|PROT_WRITE, MAP_SHARED, fd, SP7350_GPIO_PAGE_BASE);
+    if (sp7350_gpio_page == MAP_FAILED)
+    {
+      sp7350_gpio_page = NULL;
+      close(fd);
+      return wiringPiFailure (WPI_ALMOST,"wiringPiSetup: mmap (SP7350 GPIO) failed: %s\n", strerror (errno)) ;
+    }
+
+    sp7350_gpio_first = sp7350_gpio_page + (SP7350_GPIO_FIRST_OFFSET >> 2);
+    sp7350_gpio_gpioxt = sp7350_gpio_page + (SP7350_GPIO_GPIOXT_OFFSET >> 2);
     close(fd);
     initialiseEpoch () ;
     return 0 ;
