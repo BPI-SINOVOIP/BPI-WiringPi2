@@ -2066,6 +2066,14 @@ static void spacemit_update_reg(volatile uint32_t *base, int offset, uint32_t cl
   *reg = regval;
 }
 
+static void spacemit_write_reg(volatile uint32_t *base, int offset, uint32_t value)
+{
+  if (!spacemit_gpio_mapped() || base == NULL || offset < 0)
+    return;
+
+  *(base + (offset >> 2)) = value;
+}
+
 static void spacemit_set_pin_alt(int pin, int mode)
 {
   int mfpr = spacemit_mfpr_offset(pin);
@@ -2097,7 +2105,7 @@ static void spacemit_set_pin_mode(int pin, int mode)
   else
     return;
 
-  spacemit_update_reg(spacemit_gpio, dir_offset, 0, 1u << shift);
+  spacemit_write_reg(spacemit_gpio, dir_offset, 1u << shift);
 }
 
 static int spacemit_get_pin_mode(int pin)
@@ -2155,7 +2163,7 @@ static void spacemit_digitalWrite(int pin, int value)
     return;
 
   offset = bank + (value == LOW ? spacemit_gpcr_offset() : spacemit_gpsr_offset());
-  spacemit_update_reg(spacemit_gpio, offset, 0, 1u << shift);
+  spacemit_write_reg(spacemit_gpio, offset, 1u << shift);
 }
 
 static int renesas_gpio_mapped(void)
