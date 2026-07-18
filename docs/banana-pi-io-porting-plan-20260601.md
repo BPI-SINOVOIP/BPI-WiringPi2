@@ -8,8 +8,14 @@ Repository role: WiringPi-compatible C library and `gpio` command support.
 
 Reference matrix:
 
-- Armbian board matrix: `/media/pi/SMCI/armbian/bpi-v26.2.1/docs/bananapi-board-support-priority-20260601.md`
-- Companion Python GPIO repo: `/media/pi/SMCI/bpi/RPi.GPIO`
+- Published Banana Pi board/GPIO status: https://github.com/BPI-SINOVOIP/BPI-WiringPi2/wiki/Board-Support-Matrix
+- Evidence and hardware-validation contract: https://github.com/BPI-SINOVOIP/BPI-WiringPi2/wiki/Hardware-Validation
+- Armbian integration source: https://github.com/armbian/build
+- Companion Python GPIO repo: https://github.com/BPI-SINOVOIP/RPi.GPIO
+
+The 2026-07-18 canonical matrix owns product coverage and scope. When an older
+row below conflicts with that matrix or with the reconciliation section at the
+end of this file, the newer evidence wins.
 
 ## Goal
 
@@ -48,6 +54,12 @@ The supported IO surface is:
 - `blocked`: exact board files, pinout, or GPIO backend are missing.
 - `deferred`: board is application-only, router firmware-only, or has no clear
   40-pin header target for these libraries.
+- `scope-review`: public non-standard IO exists, but product/library policy must
+  decide whether WiringPi-compatible numbering is appropriate.
+- `not-applicable`: the product has no applicable user GPIO connector for this
+  library; Linux-internal GPIO may still be handled with libgpiod.
+- `base-covered`: the module/application is used through an already supported
+  exact carrier/base board and does not need a separate pin map.
 
 ## Per-Board Checklist
 
@@ -120,7 +132,7 @@ The supported IO surface is:
 | BPI-M7 | RK3588 | done | Added RK3588 selection to the Rockchip GPIO v2 mmap backend and 40-pin map from the official Banana Pi M7 GPIO table plus Armbian `rk3588-bananapi-m7`. Basic GPIO input/output/read/write build-tested; pull/alt/PWM remain no-op pending RK3588 GRF pinctrl hardware validation. Pin 28 uses GPIO 149 derived from the explicit `GPIO4_C5` function because the official number cell is missing/misaligned. I2C/SPI metadata is `/dev/i2c-7` + `/dev/spidev0.0`, pending Armbian overlay and hardware device-node validation. |
 | BPI-W3 | RK3588 | done | Added W3 aliases/model detection and a W3-specific RK3588 40-pin map from the official Banana Pi W3 GPIO table plus Armbian `rk3588-bananapi-w3`. The W3 table matches M7 for most pins but leaves physical pin 37 unassigned, so this repo keeps pin 37 as non-GPIO instead of aliasing W3 to M7. Basic GPIO input/output/read/write build-tested; pull/alt/PWM remain no-op pending RK3588 GRF pinctrl hardware validation. I2C/SPI metadata is `/dev/i2c-7` + `/dev/spidev0.0`, pending Armbian overlay and hardware device-node validation. |
 | BPI-AIM7 IO | RK3588 | alias | Added AIM7 aliases/model detection using the M7-compatible 40-pin map from the official BPI-AIM7 development kit table plus Armbian `rk3588-armsom-aim7-io`. Basic GPIO input/output/read/write build-tested; pull/alt/PWM remain no-op pending RK3588 GRF pinctrl hardware validation. |
-| BPI-LM7 | RK3588 module | blocked | Official LM7 documentation describes the LGA core module, not a fixed 40-pin header. Needs an exact carrier/baseboard GPIO map before adding an alias. |
+| BPI-LM7 | RK3588 module | base-covered | Official documentation identifies W3 as the LM7 development kit. Use the W3 carrier map; request only real LM7+W3 `model`/`compatible` evidence before adding a detection alias. |
 | BPI-M4 Super | RK3568 | done | Added M4 Super aliases/model detection using the existing RK3568 Rockchip GPIO v2 mmap backend. The 40-pin map is from the official Banana Pi M4 Super GPIO table plus Armbian `rk3568-armsom-sige3`. Basic GPIO input/output/read/write build-tested; pull/alt/PWM remain no-op pending RK3568 GRF pinctrl hardware validation. I2C/SPI metadata is `/dev/i2c-5` + `/dev/spidev2.0`, pending Armbian overlay and hardware device-node validation. |
 | BPI-M1 Super | RK3528 | done | Added RK3528 selection to the Rockchip GPIO v2 mmap backend and M1 Super aliases/model detection. The 40-pin map is from the ArmSoM Sige1-compatible official table plus Armbian `rk3528-armsom-sige1`; this avoids malformed GPIO number cells seen in the Banana Pi BPI-M1S page. Basic GPIO input/output/read/write build-tested; pull/alt/PWM remain no-op pending RK3528 GRF pinctrl hardware validation. I2C/SPI metadata is `/dev/i2c-1` + `/dev/spidev0.0`, pending Armbian overlay and hardware device-node validation. |
 | BPI-Forge1 | RK3506J | done | Added RK3506 selection to the Rockchip GPIO v2 mmap backend and Forge1 aliases/model detection. The 40-pin map is compatible with the M1 Super/Sige1 map and comes from the official Banana Pi Forge1 GPIO table plus Armbian `rk3506b-armsom-forge1`. Basic GPIO input/output/read/write build-tested; pull/alt/PWM remain no-op pending RK3506 GRF pinctrl hardware validation. I2C/SPI metadata reuses `/dev/i2c-1` + `/dev/spidev0.0`, pending Armbian overlay and hardware device-node validation. |
@@ -135,7 +147,7 @@ The supported IO surface is:
 | BPI-M6 | Synaptics VS680 | done | Added VS680 DW APB GPIO mmap backend from Armbian/vendor DTS (`gpio0/1/2` and `sm_gpio0`) and the official BPI-M6 CON3 40-pin table. SoC GPIO and SM_GPIO header pins are supported; header pins routed through the FXL6408 I2C expander remain non-GPIO in this mmap backend pending a separate gpiod/sysfs expander path. I2C metadata is `/dev/i2c-0`; SPI metadata is `/dev/spidev0.0`, pending hardware device-node validation. |
 | BPI-F2S / BPI-F2P | Sunplus SP7021 | done | Added SP7021 GPIO mmap backend from Armbian/vendor pinctrl registers (`pctl@0x9C000100`, base0/base1/base2 register banks) and the F2S/F2P 40-pin map from the official schematics. Pull/alt/PWM remain no-op or GPIO-claim only pending Sunplus pinctrl hardware validation. I2C metadata is `/dev/i2c-0`; SPI metadata is `/dev/spidev0.0`, pending hardware device-node validation. |
 | BPI-CM6 | SpacemiT K1 | done | Added CM6-specific 26-pin IO board map from the official CM6 docs; reuses the K1 SpacemiT mmap backend from F3. Physical pin 12 is GPIO44, so CM6 is not aliased to F3. I2C metadata is `/dev/i2c-4`; SPI metadata is `/dev/spidev3.0`. Local build checks passed. |
-| BPI-SM10 | SpacemiT K3 | blocked | Official docs and local K3 DTS identify the board as `spacemit/k3_com260.dtb`, but no authoritative 40-pin expansion header map or schematic has been found in docs or SDK yet. Do not guess. |
+| BPI-SM10 | SpacemiT K3 | todo | Official 40-pin table, carrier schematic, local K3 SDK and exact `k3_com260.dts` are now available. Implement only after mapping each exposed signal to K3 `gpiochip`/offset; keep hardware validation open. |
 | BPI-M2C | UniSoC UIS7885 | blocked | Armbian path is PAC/hybrid; userspace GPIO support depends on usable kernel GPIO exposure. |
 
 ### Batch E: routers, app products, and blocked families
@@ -144,17 +156,38 @@ The supported IO surface is:
 | --- | --- | --- |
 | BPI-R4 | done | Added MT7988 GPIO v2 mmap backend from Armbian/kernel pinctrl registers (`pio@1001f000`) and the official CON2 26-pin GPIO map. Mode/input/output/read/write build-tested. Pull/PWM remain no-op pending hardware validation. I2C metadata is `/dev/i2c-1`; SPI metadata is `/dev/spidev1.0`, pending Armbian device-node validation. |
 | BPI-R3 | done | Added MT7986 GPIO support by reusing the MTK GPIO v2 mmap backend (`pio@1001f000`) and the official R3 26-pin GPIO image (`r3_gpio_40.jpg`). Basic mode/input/output/read/write build-tested. Pull/PWM remain no-op pending hardware validation. I2C metadata is `/dev/i2c-0`; SPI metadata is `/dev/spidev0.0`, pending Armbian device-node validation. |
-| BPI-R3 Mini | blocked | Official docs only show generic sysfs GPIO examples and board interfaces; no authoritative 26/40-pin expansion header map was found. Do not alias it to R3 without a confirmed carrier/header map. |
+| BPI-R3 Mini | not-applicable | Official interfaces and exact DTS expose no Raspberry-Pi-style expansion-header policy. Keep board-internal fan/button/LED work at the Linux/libgpiod layer. |
 | BPI-R64 | done | Added MT7622 GPIO support using the official R64 40-pin GPIO image (`r64_gpio_40.jpg`) and mainline `pinctrl-mt7622` register ranges (`pinctrl@10211000`). Mode/input/output/read/write and pull-up/down build-tested. I2C metadata is `/dev/i2c-0`; SPI metadata is `/dev/spidev0.0`, pending Armbian device-node validation. |
 | BPI-R4 Lite | done | Added MT7987 GPIO v2 support by reusing the MTK v2 mmap backend (`pio@1001f000`) and the Armbian 6.17 `mt7987a-bananapi-bpi-r4-lite-mikrobus.dtsi` map. BOARD mode follows the 2x8 MikroBUS physical pins 1-16; GPIO-capable pins are 5/6/7/8/10/11/12/13/14 only. I2C metadata is `/dev/i2c-3`; SPI metadata is `/dev/spidev1.0`, pending hardware device-node validation. |
 | BPI-R4 Pro | done | Added MT7988 GPIO v2 support using the Armbian 6.17 `mt7988a-bananapi-bpi-r4-pro.dtsi` 26-pin map. The physical header matches the existing R4 map, but R4 Pro has its own board aliases/header so later 4e/8x differences can be adjusted independently. Detection now checks `/proc/device-tree/compatible` before the model string because the 4e/8x DTS model string is still generic `Bananapi BPI-R4`. I2C metadata is `/dev/i2c-1`; SPI metadata is `/dev/spidev1.0`, pending hardware device-node validation. |
-| BPI-R2 Mini / R4 Mini / OpenWrt One | blocked | Reviewed local Armbian tree on 2026-06-02: no R2 Mini/R4 Mini board target or DTS was found. OpenWrt One has MT7981B DTS files, but 6.17 disables the DTB and the available DTS only exposes board internals such as memory/LED/flash/UART; no authoritative external IO header map is present. Do not add aliases until board targets and header policy are available. |
+| BPI-R2 Mini | not-applicable | Existing applicability audit records no Raspberry-Pi-style GPIO library map. Reopen only if an intended external raw-GPIO connector is documented. |
+| BPI-R4 Mini | blocked | Public product data still lacks an exact external connector map, schematic, BSP/OpenWrt profile and runtime evidence. |
+| OpenWrt One | scope-review | Official schematic/KiCad and mikroBUS evidence now exist. Decide whether this library should cover mikroBUS, then map connector pins to MT7981 GPIO and validate on hardware. |
 | BPI-WiFi5 / WiFi6 / RT2 / RV2 | deferred | Reviewed local Armbian board matrix/docs on 2026-06-02: WiFi6 is Triductor/OpenWrt BSP only, RT2 is Realtek OpenWrt UBI flow, and WiFi5/RV2 are Siflower OpenWrt/FIT/web-upgrade flows with no local Armbian board family. No stable raw-image board target or external GPIO header policy exists for WiringPi. |
 | BPI-F2 / F4 / F5 / S64 / Secure-Pi / SM9 / AI2H / Loongson boards | blocked | Reviewed local Armbian priority docs on 2026-06-02: F2 lacks exact i.MX6 BPI board files; F4 needs a new SP7350 Sunplus family; F5 has no BPI-F5 T527 DTS/defconfig; S64 lacks Actions S700 Armbian/U-Boot targets; Secure-Pi has example repos but no Linux/U-Boot BSP; SM9 needs BM1688 SDK/boot-chain integration; AI2H has Renesas EVK files but no Banana Pi carrier DTS/DDR/board hook; Loongson boards need exact embedded U-Boot/BIOS/DTS/image policy beyond generic `uefi-loong64`. Do not add GPIO aliases until exact board files and header maps exist. |
 
+## 2026-07-18 Canonical Matrix Reconciliation
+
+This section supersedes stale discovery statements in the 2026-06-01 batches.
+
+| Board/group | Current decision | Evidence-driven next action |
+| --- | --- | --- |
+| BPI-F4 | `todo` | Official terminal map, Q654 source, schematic and image exist; start SP7350 backend/detection work, then obtain exact DTS/gpioinfo/hardware logs. |
+| BPI-CanMV-K230D Zero | `todo` | Official 40-pin table, schematic and SDK exist; derive Linux gpiochip/offset and implement board mapping/backend without guessing runtime numbering. |
+| BPI-SM10 | `todo` | Official 40-pin table/schematic and local exact K3 DTS exist; complete signal-to-controller mapping, backend and tests. |
+| BPI-CM5 + CM4IO | `blocked` | CM4IO claims CM5 compatibility, but the published table is CM4/A311D context; require CM5/A311D2-specific carrier/DTS/gpioinfo evidence. |
+| BPI-Secure-Pi / BPI-SM9 | `blocked` | Official 40-pin tables exist; exact board BSP/DTS/gpiochip mapping and runtime logs remain missing. |
+| RK3588 Stamp-hole / Gold-finger | `blocked` | Require an exact carrier product/revision, or mark the standalone module not applicable. |
+| BPI-LM7 + W3 | `base-covered` | Reuse W3 carrier; collect only detection identity and hardware evidence for the exact combination. |
+| BPI-R2 Mini / BPI-R3 Mini | `not-applicable` | Do not create Pi-style library targets unless product policy introduces an intended raw GPIO connector. |
+| K3 Pico-ITX / OpenWrt One / BPI-5202 / BPI-2K3000 | `scope-review` | Resolve FPC/RT24, mikroBUS, module-bus, or isolated-IO policy before any library promise. |
+| Other blocked/deferred boards | published matrix | Follow the board decision in the Wiki support matrix and collect the evidence required by the Wiki hardware-validation contract. |
+
 ## Current Next Item
 
-No remaining planned `todo` items. Continue with hardware validation for completed boards or reopen blocked rows when exact board files/header maps become available.
+The old “No remaining planned `todo` items” conclusion is retired. The next
+software-startable sequence is BPI-F4, BPI-SM10, then BPI-CanMV-K230D Zero;
+boards without exact evidence remain blocked by the Wiki evidence contract.
 
 Resume sequence:
 

@@ -1,5 +1,12 @@
 # WiringPi Library
 
+> **Banana Pi fork:** this repository adds Banana Pi board detection, connector
+> maps and SoC GPIO backends to the WiringPi C library and `gpio` command.
+> Start with the [BPI-WiringPi2 Wiki](https://github.com/BPI-SINOVOIP/BPI-WiringPi2/wiki)
+> and check the [board support matrix](https://github.com/BPI-SINOVOIP/BPI-WiringPi2/wiki/Board-Support-Matrix)
+> before driving a pin. Support is specific to the exact board, carrier and
+> revision; code presence does not imply every pull/alt/PWM feature is verified.
+
 Welcome to the WiringPi Library, the highly performant GPIO access library for Raspberry Pi boards. This library is written in C and is designed to provide fast and efficient control of the GPIO pins by directly accessing the hardware registers using DMA. 
 
 **Key Features:**  
