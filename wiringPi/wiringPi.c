@@ -419,6 +419,7 @@ const char *piModelNames [PI_MODELS_MAX] =
   [BPI_MODEL_R4PRO]   = "Banana Pi R4 Pro[MT7988]",
   [BPI_MODEL_F4]      = "Banana Pi F4[Sunplus SP7350]",
   [BPI_MODEL_SM10]    = "Banana Pi SM10[SpacemiT K3]",
+  [BPI_MODEL_K230D_ZERO] = "Banana Pi CanMV-K230D-Zero[Kendryte K230D]",
 #endif
 } ;
 

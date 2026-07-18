@@ -337,6 +337,24 @@ int *pinTobcm_BP ;
 #define SP7350_R32_ROF(r)              (((r) >> 5) << 2)
 #define SP7350_R32_BOF(r)              ((r) & 0x1f)
 
+// Kendryte K230/K230D GPIO and IOMUX (BPI-CanMV-K230D Zero)
+#define K230_GPIO_BANKS                2
+#define K230_GPIO_PIN_BASE             0
+#define K230_GPIO_PIN_END              63
+#define K230_GPIO_MAP_SIZE             0x1000
+#define K230_GPIO0_BASE                0x9140B000
+#define K230_GPIO1_BASE                0x9140C000
+#define K230_IOMUX_BASE                0x91105000
+#define K230_SWPORT_DR                 0x00
+#define K230_SWPORT_DDR                0x04
+#define K230_EXT_PORT                  0x50
+#define K230_IOMUX_SEL_SHIFT           11
+#define K230_IOMUX_SEL_MASK            (0x7u << K230_IOMUX_SEL_SHIFT)
+#define K230_IOMUX_IE                  (1u << 8)
+#define K230_IOMUX_OE                  (1u << 7)
+#define K230_IOMUX_PU                  (1u << 6)
+#define K230_IOMUX_PD                  (1u << 5)
+
 struct realtek_gpio_group
 {
   int pin_base;
@@ -457,6 +475,7 @@ static int bpi_found_realtek = 0 ;
 static int bpi_found_vs680 = 0 ;
 static int bpi_found_sp7021 = 0 ;
 static int bpi_found_sp7350 = 0 ;
+static int bpi_found_k230 = 0 ;
 static uint8_t *mtk_gpio_base = NULL ;
 static uint8_t *mtk_v2_gpio_base = NULL ;
 static uint8_t *mtk_mt7622_gpio_base = NULL ;
@@ -476,6 +495,12 @@ static volatile uint32_t *sp7021_gpio_base2 = NULL ;
 static volatile uint32_t *sp7350_gpio_page = NULL ;
 static volatile uint32_t *sp7350_gpio_first = NULL ;
 static volatile uint32_t *sp7350_gpio_gpioxt = NULL ;
+static volatile uint32_t *k230_gpio[K230_GPIO_BANKS] = { NULL };
+static volatile uint32_t *k230_iomux = NULL;
+static const off_t k230_gpio_base[K230_GPIO_BANKS] = {
+  K230_GPIO0_BASE,
+  K230_GPIO1_BASE,
+};
 static const off_t rockchip_gpio_base_rk3308[ROCKCHIP_GPIO_BANKS] = {
   0xff220000,
   0xff230000,
@@ -2993,6 +3018,138 @@ static void sp7350_digitalWrite(int pin, int value)
   sp7350_update_masked(sp7350_gpio_gpioxt, offset, bit, value != LOW);
 }
 
+static int k230_gpio_mapped(void)
+{
+  return k230_gpio[0] != NULL && k230_gpio[1] != NULL && k230_iomux != NULL;
+}
+
+static int k230_is_pin(int pin)
+{
+  return pin >= K230_GPIO_PIN_BASE && pin <= K230_GPIO_PIN_END;
+}
+
+static volatile uint32_t *k230_gpio_regs(int pin)
+{
+  return k230_is_pin(pin) ? k230_gpio[pin >> 5] : NULL;
+}
+
+static unsigned int k230_pin_shift(int pin)
+{
+  return (unsigned int)pin & 0x1f;
+}
+
+static void k230_update_reg(volatile uint32_t *base, unsigned int offset,
+                            uint32_t clear, uint32_t set)
+{
+  volatile uint32_t *reg;
+  uint32_t value;
+
+  if (!k230_gpio_mapped() || base == NULL)
+    return;
+
+  reg = base + (offset >> 2);
+  value = *reg;
+  value &= ~clear;
+  value |= set;
+  *reg = value;
+}
+
+static void k230_set_pin_alt(int pin, int mode)
+{
+  if (!k230_is_pin(pin) || !k230_gpio_mapped())
+    return;
+
+  k230_update_reg(k230_iomux, (unsigned int)pin << 2,
+                  K230_IOMUX_SEL_MASK,
+                  ((uint32_t)mode & 0x7u) << K230_IOMUX_SEL_SHIFT);
+}
+
+static void k230_set_pin_mode(int pin, int mode)
+{
+  volatile uint32_t *gpio_regs = k230_gpio_regs(pin);
+  uint32_t bit;
+
+  if (!k230_is_pin(pin) || !k230_gpio_mapped())
+    return;
+
+  bit = 1u << k230_pin_shift(pin);
+  if (mode == INPUT)
+  {
+    k230_update_reg(k230_iomux, (unsigned int)pin << 2,
+                    K230_IOMUX_SEL_MASK | K230_IOMUX_OE,
+                    K230_IOMUX_IE);
+    k230_update_reg(gpio_regs, K230_SWPORT_DDR, bit, 0);
+  }
+  else if (mode == OUTPUT)
+  {
+    k230_update_reg(k230_iomux, (unsigned int)pin << 2,
+                    K230_IOMUX_SEL_MASK,
+                    K230_IOMUX_IE | K230_IOMUX_OE);
+    k230_update_reg(gpio_regs, K230_SWPORT_DDR, 0, bit);
+  }
+}
+
+static int k230_get_pin_mode(int pin)
+{
+  volatile uint32_t *gpio_regs = k230_gpio_regs(pin);
+  uint32_t iomux_value;
+  uint32_t alt;
+  uint32_t bit;
+
+  if (!k230_is_pin(pin) || !k230_gpio_mapped())
+    return INPUT;
+
+  iomux_value = k230_iomux[pin];
+  alt = (iomux_value & K230_IOMUX_SEL_MASK) >> K230_IOMUX_SEL_SHIFT;
+  if (alt != 0)
+    return (int)alt + 2;
+
+  bit = 1u << k230_pin_shift(pin);
+  return (gpio_regs[K230_SWPORT_DDR >> 2] & bit) ? OUTPUT : INPUT;
+}
+
+static void k230_pullUpDnControl(int pin, int pud)
+{
+  uint32_t set = 0;
+
+  if (!k230_is_pin(pin) || !k230_gpio_mapped())
+    return;
+
+  if (pud == PUD_UP)
+    set = K230_IOMUX_PU;
+  else if (pud == PUD_DOWN)
+    set = K230_IOMUX_PD;
+
+  k230_update_reg(k230_iomux, (unsigned int)pin << 2,
+                  K230_IOMUX_PU | K230_IOMUX_PD, set);
+}
+
+static int k230_digitalRead(int pin)
+{
+  volatile uint32_t *gpio_regs = k230_gpio_regs(pin);
+  uint32_t bit;
+
+  if (!k230_is_pin(pin) || !k230_gpio_mapped())
+    return LOW;
+
+  bit = 1u << k230_pin_shift(pin);
+  return (gpio_regs[K230_EXT_PORT >> 2] & bit) ? HIGH : LOW;
+}
+
+static void k230_digitalWrite(int pin, int value)
+{
+  volatile uint32_t *gpio_regs = k230_gpio_regs(pin);
+  uint32_t bit;
+
+  if (!k230_is_pin(pin) || !k230_gpio_mapped())
+    return;
+
+  bit = 1u << k230_pin_shift(pin);
+  k230_update_reg(gpio_regs, K230_SWPORT_DR,
+                  value == LOW ? bit : 0,
+                  value == LOW ? 0 : bit);
+}
+
 #ifdef BPI
 
 int bpi_getAlt (int pin)
@@ -3036,6 +3193,8 @@ int bpi_getAlt (int pin)
     return sp7021_get_pin_mode(pin);
   if (bpi_found_sp7350)
     return sp7350_get_pin_mode(pin);
+  if (bpi_found_k230)
+    return k230_get_pin_mode(pin);
 
   alt=sunxi_get_pin_mode(pin);
   return alt ;
@@ -3044,7 +3203,7 @@ int bpi_getAlt (int pin)
 
 void bpi_pwmSetMode (int mode)
 {
-  if (bpi_found_mtk || bpi_found_mtk_v2 || bpi_found_mtk_mt7622 || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek || bpi_found_vs680 || bpi_found_sp7021 || bpi_found_sp7350)
+  if (bpi_found_mtk || bpi_found_mtk_v2 || bpi_found_mtk_mt7622 || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek || bpi_found_vs680 || bpi_found_sp7021 || bpi_found_sp7350 || bpi_found_k230)
     return;
 
   sunxi_pwm_set_mode(mode);
@@ -3054,7 +3213,7 @@ void bpi_pwmSetMode (int mode)
 
 void bpi_pwmSetRange (unsigned int range)
 {
-  if (bpi_found_mtk || bpi_found_mtk_v2 || bpi_found_mtk_mt7622 || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek || bpi_found_vs680 || bpi_found_sp7021 || bpi_found_sp7350)
+  if (bpi_found_mtk || bpi_found_mtk_v2 || bpi_found_mtk_mt7622 || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek || bpi_found_vs680 || bpi_found_sp7021 || bpi_found_sp7350 || bpi_found_k230)
     return;
 
   sunxi_pwm_set_period(range);
@@ -3064,7 +3223,7 @@ void bpi_pwmSetRange (unsigned int range)
 
 void bpi_pwmSetClock (int divisor)
 {
-  if (bpi_found_mtk || bpi_found_mtk_v2 || bpi_found_mtk_mt7622 || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek || bpi_found_vs680 || bpi_found_sp7021 || bpi_found_sp7350)
+  if (bpi_found_mtk || bpi_found_mtk_v2 || bpi_found_mtk_mt7622 || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek || bpi_found_vs680 || bpi_found_sp7021 || bpi_found_sp7350 || bpi_found_k230)
     return;
 
   sunxi_pwm_set_clk(divisor);
@@ -3187,6 +3346,11 @@ void bpi_pinModeAlt (int pin, int mode)
     if (bpi_found_sp7350)
     {
       sp7350_set_pin_alt(pin, mode);
+      return;
+    }
+    if (bpi_found_k230)
+    {
+      k230_set_pin_alt(pin, mode);
       return;
     }
     sunxi_set_pin_alt(pin,mode);
@@ -3492,6 +3656,32 @@ void bpi_pinMode (int pin, int mode)
       return;
     }
 
+    if (bpi_found_k230)
+    {
+      if (mode == INPUT || mode == OUTPUT)
+      {
+        k230_set_pin_mode(pin, mode);
+      }
+      else if (mode == PULLUP)
+      {
+        k230_pullUpDnControl(pin, PUD_UP);
+      }
+      else if (mode == PULLDOWN)
+      {
+        k230_pullUpDnControl(pin, PUD_DOWN);
+      }
+      else if (mode == PULLOFF)
+      {
+        k230_pullUpDnControl(pin, PUD_OFF);
+      }
+      else
+      {
+        return;
+      }
+      wiringPinMode = mode;
+      return;
+    }
+
     if (mode == INPUT)
     {
       sunxi_set_pin_mode(pin,INPUT);
@@ -3637,6 +3827,11 @@ void bpi_pullUpDnControl (int pin, int pud)
       sp7350_pullUpDnControl(pin, pud);
       return;
     }
+    if (bpi_found_k230)
+    {
+      k230_pullUpDnControl(pin, pud);
+      return;
+    }
     sunxi_pullUpDnControl(pin, pud);
     return;
   }
@@ -3717,6 +3912,8 @@ int bpi_digitalRead (int pin)
       return sp7021_digitalRead(pin);
     if (bpi_found_sp7350)
       return sp7350_digitalRead(pin);
+    if (bpi_found_k230)
+      return k230_digitalRead(pin);
 
     return sunxi_digitalRead(pin);
   }
@@ -3828,6 +4025,11 @@ void bpi_digitalWrite (int pin, int value)
       sp7350_digitalWrite(pin, value);
       return;
     }
+    if (bpi_found_k230)
+    {
+      k230_digitalWrite(pin, value);
+      return;
+    }
     sunxi_digitalWrite(pin, value); 
   }
   else
@@ -3844,7 +4046,7 @@ void bpi_pwmWrite (int pin, int value)
 
   uint32_t a_val = 0;
 
-  if (bpi_found_mtk || bpi_found_mtk_v2 || bpi_found_mtk_mt7622 || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek || bpi_found_vs680 || bpi_found_sp7021 || bpi_found_sp7350)
+  if (bpi_found_mtk || bpi_found_mtk_v2 || bpi_found_mtk_mt7622 || bpi_found_sun50iw9 || bpi_found_meson || bpi_found_spacemit || bpi_found_renesas || bpi_found_rockchip || bpi_found_realtek || bpi_found_vs680 || bpi_found_sp7021 || bpi_found_sp7350 || bpi_found_k230)
     return;
 
   if(pwmmode==1)//sycle
@@ -4135,6 +4337,10 @@ struct BPIBoards bpiboard [] =
   { "bananapism10",   14201, BPI_MODEL_SM10, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_SM10, physToGpio_BPI_SM10, pinTobcm_BPI_SM10, SM10_I2C_DEV, SM10_SPI_DEV, {SM10_PWM_OFFSET,SM10_I2C_OFFSET,SM10_SPI_OFFSET} },
   { "bananapi-sm10",  14201, BPI_MODEL_SM10, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_SM10, physToGpio_BPI_SM10, pinTobcm_BPI_SM10, SM10_I2C_DEV, SM10_SPI_DEV, {SM10_PWM_OFFSET,SM10_I2C_OFFSET,SM10_SPI_OFFSET} },
   { "banana-pi-sm10", 14201, BPI_MODEL_SM10, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_SM10, physToGpio_BPI_SM10, pinTobcm_BPI_SM10, SM10_I2C_DEV, SM10_SPI_DEV, {SM10_PWM_OFFSET,SM10_I2C_OFFSET,SM10_SPI_OFFSET} },
+  { "bpi-canmv-k230d-zero",       14301, BPI_MODEL_K230D_ZERO, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_K230D_ZERO, physToGpio_BPI_K230D_ZERO, pinTobcm_BPI_K230D_ZERO, K230D_ZERO_I2C_DEV, K230D_ZERO_SPI_DEV, {K230D_ZERO_PWM_OFFSET,K230D_ZERO_I2C_OFFSET,K230D_ZERO_SPI_OFFSET} },
+  { "bpi-k230d-zero",             14301, BPI_MODEL_K230D_ZERO, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_K230D_ZERO, physToGpio_BPI_K230D_ZERO, pinTobcm_BPI_K230D_ZERO, K230D_ZERO_I2C_DEV, K230D_ZERO_SPI_DEV, {K230D_ZERO_PWM_OFFSET,K230D_ZERO_I2C_OFFSET,K230D_ZERO_SPI_OFFSET} },
+  { "bananapi-canmv-k230d-zero",  14301, BPI_MODEL_K230D_ZERO, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_K230D_ZERO, physToGpio_BPI_K230D_ZERO, pinTobcm_BPI_K230D_ZERO, K230D_ZERO_I2C_DEV, K230D_ZERO_SPI_DEV, {K230D_ZERO_PWM_OFFSET,K230D_ZERO_I2C_OFFSET,K230D_ZERO_SPI_OFFSET} },
+  { "banana-pi-canmv-k230d-zero", 14301, BPI_MODEL_K230D_ZERO, 1, 3, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_K230D_ZERO, physToGpio_BPI_K230D_ZERO, pinTobcm_BPI_K230D_ZERO, K230D_ZERO_I2C_DEV, K230D_ZERO_SPI_DEV, {K230D_ZERO_PWM_OFFSET,K230D_ZERO_I2C_OFFSET,K230D_ZERO_SPI_OFFSET} },
   { "bpi-r4",      13601, BPI_MODEL_R4, 1, 4, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R4, physToGpio_BPI_R4, pinTobcm_BPI_R4, R4_I2C_DEV, R4_SPI_DEV, {R4_PWM_OFFSET,R4_I2C_OFFSET,R4_SPI_OFFSET} },
   { "bananapir4",  13601, BPI_MODEL_R4, 1, 4, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R4, physToGpio_BPI_R4, pinTobcm_BPI_R4, R4_I2C_DEV, R4_SPI_DEV, {R4_PWM_OFFSET,R4_I2C_OFFSET,R4_SPI_OFFSET} },
   { "bananapi-r4", 13601, BPI_MODEL_R4, 1, 4, BPI_MAKER_SINOVOIP, 0, pinToGpio_BPI_R4, physToGpio_BPI_R4, pinTobcm_BPI_R4, R4_I2C_DEV, R4_SPI_DEV, {R4_PWM_OFFSET,R4_I2C_OFFSET,R4_SPI_OFFSET} },
@@ -4466,6 +4672,15 @@ static struct BPIBoards *bpi_find_board_by_model_string(const char *hardware)
       strstr(hardware, "k3_com260"))
     return bpi_find_board_by_name("bpi-sm10");
 
+  if (strstr(hardware, "Banana Pi CanMV K230D Zero") ||
+      strstr(hardware, "BananaPi CanMV K230D Zero") ||
+      strstr(hardware, "Banana Pi BPI-CanMV-K230D Zero") ||
+      strstr(hardware, "BananaPi BPI-CanMV-K230D Zero") ||
+      strstr(hardware, "BPI-CanMV-K230D-Zero") ||
+      strstr(hardware, "BPI-CanMV-K230D Zero") ||
+      strstr(hardware, "bananapi-canmv-k230d-zero"))
+    return bpi_find_board_by_name("bpi-canmv-k230d-zero");
+
   if (strstr(hardware, "Banana Pi BPI-M1 Super") ||
       strstr(hardware, "BananaPi BPI-M1 Super") ||
       strstr(hardware, "Banana Pi M1 Super") ||
@@ -4691,6 +4906,7 @@ int bpi_piGpioLayout (void)
   bpi_found_vs680 = 0;
   bpi_found_sp7021 = 0;
   bpi_found_sp7350 = 0;
+  bpi_found_k230 = 0;
   if ((bpiFd = fopen("/var/lib/bananapi/board.sh", "r")) != NULL) {
     while(fgets(buffer, sizeof(buffer), bpiFd) != NULL) {
       if (sscanf(buffer, "BOARD=%1023s", hardware) != 1)
@@ -4768,6 +4984,7 @@ void bpi_piBoardId (int *model, int *rev, int *mem, int *maker, int *warranty)
     bpi_found_vs680 = bpi_model_is_vs680(board->model);
     bpi_found_sp7021 = bpi_model_is_sp7021(board->model);
     bpi_found_sp7350 = (board->model == BPI_MODEL_F4);
+    bpi_found_k230 = (board->model == BPI_MODEL_K230D_ZERO);
     //printf("BPI: name[%s] bType(%d) model(%d)\n",board->name, bType, board->model);
     *model    = bType ;
     *rev      = bRev ;
@@ -5020,6 +5237,47 @@ int bpi_wiringPiSetup (void)
     sp7350_gpio_first = sp7350_gpio_page + (SP7350_GPIO_FIRST_OFFSET >> 2);
     sp7350_gpio_gpioxt = sp7350_gpio_page + (SP7350_GPIO_GPIOXT_OFFSET >> 2);
     close(fd);
+    initialiseEpoch () ;
+    return 0 ;
+  }
+
+  if (bpi_found_k230)
+  {
+    int i;
+
+    for (i = 0; i < K230_GPIO_BANKS; ++i)
+    {
+      k230_gpio[i] = (uint32_t *)mmap(0, K230_GPIO_MAP_SIZE,
+          PROT_READ|PROT_WRITE, MAP_SHARED, fd, k230_gpio_base[i]);
+      if (k230_gpio[i] == MAP_FAILED)
+      {
+        int j;
+
+        k230_gpio[i] = NULL;
+        for (j = 0; j < i; ++j)
+        {
+          munmap((void *)k230_gpio[j], K230_GPIO_MAP_SIZE);
+          k230_gpio[j] = NULL;
+        }
+        close(fd);
+        return wiringPiFailure (WPI_ALMOST,"wiringPiSetup: mmap (K230 GPIO) failed: %s\n", strerror (errno)) ;
+      }
+    }
+
+    k230_iomux = (uint32_t *)mmap(0, K230_GPIO_MAP_SIZE,
+        PROT_READ|PROT_WRITE, MAP_SHARED, fd, K230_IOMUX_BASE);
+    close(fd);
+    if (k230_iomux == MAP_FAILED)
+    {
+      k230_iomux = NULL;
+      for (i = 0; i < K230_GPIO_BANKS; ++i)
+      {
+        munmap((void *)k230_gpio[i], K230_GPIO_MAP_SIZE);
+        k230_gpio[i] = NULL;
+      }
+      return wiringPiFailure (WPI_ALMOST,"wiringPiSetup: mmap (K230 IOMUX) failed: %s\n", strerror (errno)) ;
+    }
+
     initialiseEpoch () ;
     return 0 ;
   }
