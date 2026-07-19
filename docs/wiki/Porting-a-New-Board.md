@@ -31,6 +31,7 @@ Keep physical, wiringPi and BCM-style arrays aligned with the companion `RPi.GPI
 ## Build gate
 
 ```sh
+python3 tools/audit-bpi-support.py --peer ../RPi.GPIO
 make -C wiringPi
 make -C devLib
 make -C gpio clean
@@ -43,6 +44,7 @@ make -C gpio \
 ## Review checklist
 
 - Canonical product name plus aliases are documented.
+- The product row and status in [Complete Board Catalog](Complete-Board-Catalog) are updated.
 - Detection tests include real Device Tree strings.
 - `gpio readall` power/GND/non-GPIO positions match the exact header.
 - Unsafe pins stay unavailable.

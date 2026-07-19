@@ -80,6 +80,7 @@ The supported IO surface is:
    - implement or select GPIO read/write/mode/pull/alt backends,
    - confirm I2C/SPI/PWM device names for Armbian.
 5. Build checks:
+   - `python3 tools/audit-bpi-support.py --peer ../RPi.GPIO`
    - `make -C wiringPi`
    - `make -C devLib`
    - `make -C gpio clean && make -C gpio INCLUDE='-I../wiringPi -I../devLib' LDFLAGS='' LIBS='../wiringPi/libwiringPi.so.3.19 ../devLib/libwiringPiDev.so.3.19 -lpthread -lrt -lm -lcrypt'`
@@ -120,7 +121,7 @@ The supported IO surface is:
 | BPI-M5 | Amlogic SM1 | done | Reuses Meson backend; 40-pin map is from Dangku `bananapim5` and Armbian `meson-sm1-bananapi-m5`; local build checks passed. |
 | BPI-M2 Pro | Amlogic SM1 | alias | M5-compatible alias per Dangku M5/M2Pro handling and Armbian SM1 overlays; uses separate model id/name; local build checks passed. |
 | BPI-F3 | SpacemiT K1 | done | Added K1 GPIO mmap backend from Dangku F3/SpacemiT reference; 40-pin map is from Dangku `bananapif3`; local build checks passed. Hardware PWM remains guarded pending hardware validation. |
-| BPI-AI2N | Renesas RZ/V2N | done | Added RZ/V2N GPIO mmap backend from Dangku AI2N/Renesas reference; 40-pin map is from Dangku `bananapiai2n`; I2C is `/dev/i2c-1`, SPI is `/dev/spidev2.0`; local build checks passed. Hardware PWM remains guarded pending hardware validation. |
+| BPI-AI2N / BPI-AI2N-Carrier | Renesas RZ/V2N | done / carrier-only | Added RZ/V2N GPIO mmap backend from Dangku AI2N/Renesas reference; 40-pin map is from Dangku `bananapiai2n`; the canonical `bpi-ai2n-carrier` alias explicitly selects this carrier map. I2C is `/dev/i2c-1`, SPI is `/dev/spidev2.0`; local build checks passed. Exact production `model`/`compatible` evidence is still requested. Hardware PWM remains guarded pending hardware validation. |
 
 ### Batch C: Rockchip boards
 
@@ -162,7 +163,7 @@ The supported IO surface is:
 | BPI-R4 Lite | done | Added MT7987 GPIO v2 support by reusing the MTK v2 mmap backend (`pio@1001f000`) and the Armbian 6.17 `mt7987a-bananapi-bpi-r4-lite-mikrobus.dtsi` map. BOARD mode follows the 2x8 MikroBUS physical pins 1-16; GPIO-capable pins are 5/6/7/8/10/11/12/13/14 only. I2C metadata is `/dev/i2c-3`; SPI metadata is `/dev/spidev1.0`, pending hardware device-node validation. |
 | BPI-R4 Pro | done | Added MT7988 GPIO v2 support using the Armbian 6.17 `mt7988a-bananapi-bpi-r4-pro.dtsi` 26-pin map. The physical header matches the existing R4 map, but R4 Pro has its own board aliases/header so later 4e/8x differences can be adjusted independently. Detection now checks `/proc/device-tree/compatible` before the model string because the 4e/8x DTS model string is still generic `Bananapi BPI-R4`. I2C metadata is `/dev/i2c-1`; SPI metadata is `/dev/spidev1.0`, pending hardware device-node validation. |
 | BPI-R2 Mini | not-applicable | Existing applicability audit records no Raspberry-Pi-style GPIO library map. Reopen only if an intended external raw-GPIO connector is documented. |
-| BPI-R4 Mini | not-applicable | The official product specification lists Ethernet, M.2, USB, buttons and LEDs but no intended external raw-GPIO connector. Do not alias R4 Lite; reopen only if a future hardware revision publishes a user GPIO connector. |
+| BPI-R4 Mini | not-applicable | The official product specification lists Ethernet, M.2, USB, buttons and LEDs but no intended external raw-GPIO connector. Detection explicitly rejects R4 Mini before the generic R4 substring rule, preventing an unsafe R4 map selection. Reopen only if a future hardware revision publishes a user GPIO connector. |
 | OpenWrt One | limited | Added exact `OpenWrt One` / `openwrt,one` detection, a CN7 mikroBUS map from the official KiCad schematic, and MT7981 selection in the MTK v2 register backend. The exact OpenWrt DTS uses GPIO base `0x11d00000`; upstream pinctrl data closes CN7 GPIO-capable pins 3-8 and 10-14 to native lines `7,6,4,5,10,12,2,25,22,24,23`. BOARD mode is CN7 pin 1-16; BCM-style mode uses native MT7981 line numbers. AN/pin 9 is intentionally non-GPIO. Basic direction/read/write builds locally; pull, edge/PWM, `/dev/i2c-0`, `/dev/spidev1.0`, permissions and hardware behavior remain unverified. |
 | K3 Pico-ITX | limited | Added exact `SpacemiT K3 Pico ITX` / `spacemit,k3-pico-itx` detection and eight 3.3 V application-CPU GPIOs on physical 26-pin FPC positions 9-16: native K3 pads `21,22,28,29,31,32,33,34`. Reuses the source-backed SM10 K3 register backend. RT24-owned 26-pin signals and the complete 1.8 V 36-pin connector deliberately remain unavailable. No application-CPU I2C/SPI device is mapped for the supported subset. Basic direction/read/write builds locally; FPC orientation, permissions, pull/alt/edge/PWM and real hardware remain unverified. |
 | BPI-WiFi5 / WiFi6 / RT2 / RV2 | deferred | Reviewed local Armbian board matrix/docs on 2026-06-02: WiFi6 is Triductor/OpenWrt BSP only, RT2 is Realtek OpenWrt UBI flow, and WiFi5/RV2 are Siflower OpenWrt/FIT/web-upgrade flows with no local Armbian board family. No stable raw-image board target or external GPIO header policy exists for WiringPi. |
@@ -187,6 +188,20 @@ This section supersedes stale discovery statements in the 2026-06-01 batches.
 | BPI-R2 Mini / BPI-R3 Mini / BPI-R4 Mini | `not-applicable` | Do not create Pi-style library targets unless product policy introduces an intended raw GPIO connector. |
 | BPI-5202 / BPI-2K3000 | `scope-review` | Resolve module-bus or isolated-IO policy before any library promise. |
 | Other blocked/deferred boards | published matrix | Follow the board decision in the Wiki support matrix and collect the evidence required by the Wiki hardware-validation contract. |
+
++## 2026-07-19 Cross-Repository Integrity Audit
+
+The two repositories now ship `tools/audit-bpi-support.py` and a CI job. The
+audit verifies contiguous model IDs, display-name coverage, unique detection
+names, safe R3/R4 Mini exclusion ordering, every referenced 64-entry pin map,
+the complete 110-product catalog and optional peer-repository parity.
+
+The first full audit corrected four drift defects: the missing WiringPi M6
+display name, two missing `-1` sentinels at the end of the RPi.GPIO P2 Pro
+wiringPi-number map, unsafe generic-R4 matching of R4 Mini, and the absent
+canonical `bpi-ai2n-carrier` board alias. Both repositories now report 49
+effective model IDs and 239 detection names (218 product/model aliases plus 21
+legacy placeholders).
 
 ## Current Next Item
 

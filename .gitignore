@@ -5,3 +5,5 @@ lib*.so.*
 debian-template/wiringPi
 debian-template/wiringpi-*.deb
 gpio/gpio
+__pycache__/
+*.py[cod]

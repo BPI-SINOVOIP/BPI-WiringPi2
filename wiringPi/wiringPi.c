@@ -409,6 +409,7 @@ const char *piModelNames [PI_MODELS_MAX] =
   [BPI_MODEL_P2PRO]   = "Banana Pi P2 Pro[RK3308]",
   [BPI_MODEL_W2]      = "Banana Pi W2[RTD1296]",
   [BPI_MODEL_M4]      = "Banana Pi M4[RTD1395]",
+  [BPI_MODEL_M6]      = "Banana Pi M6[Synaptics VS680]",
   [BPI_MODEL_F2S]     = "Banana Pi F2S[Sunplus SP7021]",
   [BPI_MODEL_F2P]     = "Banana Pi F2P[Sunplus SP7021]",
   [BPI_MODEL_CM6]     = "Banana Pi CM6[SpacemiT K1]",

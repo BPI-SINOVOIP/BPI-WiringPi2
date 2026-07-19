@@ -11,5 +11,6 @@ Rules:
 3. Keep page filenames stable because GitHub Wiki links use the filename.
 4. Push the rendered pages to `BPI-WiringPi2.wiki.git` only after links and code samples pass review.
 5. Product coverage, implementation status and hardware validation are separate claims; never promote one from another.
+6. Run `python3 tools/audit-bpi-support.py` before publishing; use `--peer ../RPi.GPIO` when both working trees are available.
 
 The companion RPi.GPIO Wiki uses the same information architecture, but its examples and capability statements must follow the Python implementation.
