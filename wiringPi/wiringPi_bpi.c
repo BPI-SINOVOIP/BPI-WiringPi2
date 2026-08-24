@@ -4983,7 +4983,8 @@ void bpi_piBoardId (int *model, int *rev, int *mem, int *maker, int *warranty)
   struct BPIBoards *board=bpiboard;
   static int  gpioLayout = -1 ;
 
-  gpioLayout = piGpioLayout () ;
+  /* 直接讀取已快取的 BPI 版型，避免在 RaspberryPiModel 尚未寫入時得到 -1。 */
+  gpioLayout = bpi_piGpioLayout () ;
   //printf("BPI: gpioLayout(%d)\n", gpioLayout);
   if(gpioLayout >= BPI_MODEL_MIN) {
     for (board = bpiboard ; board->name != NULL ; ++board) {
